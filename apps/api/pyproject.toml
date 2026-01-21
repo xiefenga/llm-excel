@@ -1,0 +1,19 @@
+[project]
+name = "llm-excel-api"
+version = "0.1.0"
+description = "LLM辅助生成Excel数据处理规则的系统 - API服务"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.20",
+    "openai>=1.0.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "python-dotenv>=1.0.0",
+    "sse-starlette>=2.0.0",
+]
+
+[project.scripts]
+dev = "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
