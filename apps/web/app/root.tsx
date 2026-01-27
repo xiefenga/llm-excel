@@ -1,14 +1,19 @@
-import {
-  isRouteErrorResponse,
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+
+import "./app.css";
+import { Toaster } from '~/components/ui/sonner'
 
 import type { Route } from "./+types/root";
-import "./app.css";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: false,
+    }
+  }
+})
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/svg+xml", href: "/logo.svg" },
@@ -24,7 +29,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         <Links />
       </head>
       <body className="h-screen w-screen overflow-hidden">
-        {children}
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <Toaster />
+        </QueryClientProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

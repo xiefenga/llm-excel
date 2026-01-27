@@ -25,21 +25,6 @@ class ApiResponse(BaseModel, Generic[T]):
     )
 
 
-class HealthResponse(BaseModel):
-    """健康检查响应"""
-
-    status: str = Field(
-        ...,
-        description="服务状态",
-        examples=["ok"],
-    )
-    service: str = Field(
-        ...,
-        description="服务名称",
-        examples=["LLM Excel API"],
-    )
-
-
 class ErrorResponse(BaseModel):
     """错误响应"""
 

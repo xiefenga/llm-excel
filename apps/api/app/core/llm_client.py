@@ -56,7 +56,6 @@ class LLMClient:
             LLM 响应内容
         """
 
-        print(system_prompt)
         request_params = {
             "model": self.model,
             "messages": [

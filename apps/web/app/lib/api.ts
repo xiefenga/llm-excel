@@ -30,6 +30,8 @@ export interface SSEMessage {
     message?: string;
     output_file?: string;
     formulas?: string;
+    turn_id?: string;
+    thread_id?: string;
   };
 }
 
@@ -75,10 +77,102 @@ export async function uploadFiles(files: File[], onProgress?: (progress: number)
   }
 }
 
+// 线程相关类型
+export interface ThreadListItem {
+  id: string;
+  title: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  turn_count: number;
+}
+
+export interface ThreadTurn {
+  id: string;
+  turn_number: number;
+  user_query: string;
+  status: string;
+  analysis?: string | null;
+  operations_json?: Record<string, unknown> | null;
+  error_message?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+  file_ids?: string[];
+  files?: { id: string, filename: string, path: string }[]
+  result?: {
+    output_file?: string | null;
+    output_file_path?: string | null;
+    formulas?: Record<string, unknown> | null;
+  };
+}
+
+export interface ThreadDetail {
+  id: string;
+  title: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  turns: ThreadTurn[];
+}
+
+// 获取线程列表
+export async function getThreads(): Promise<ThreadListItem[]> {
+  try {
+    const res = await axios.get<ApiResponse<ThreadListItem[]>>(`${API_BASE}/threads`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    return res.data.data || [];
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取线程详情
+export async function getThreadDetail(threadId: string): Promise<ThreadDetail> {
+  try {
+    const res = await axios.get<ApiResponse<ThreadDetail>>(`${API_BASE}/threads/${threadId}`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("线程不存在");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 删除线程
+export async function deleteThread(threadId: string): Promise<void> {
+  try {
+    const res = await axios.delete<ApiResponse<null>>(`${API_BASE}/threads/${threadId}`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "删除失败");
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "删除失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("删除失败");
+  }
+}
+
 interface ProcessExcelOptions {
   body: {
     query: string;
     file_ids: string[];
+    thread_id?: string;
   }
   events: {
     onStart?: () => void;

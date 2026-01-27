@@ -1,15 +1,68 @@
 """配置"""
 
 from pathlib import Path
+from typing import Optional
 
-# 存储目录
-STORAGE_DIR = Path("storage")
-UPLOAD_DIR = STORAGE_DIR / "uploads"
-OUTPUT_DIR = STORAGE_DIR / "outputs"
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """应用配置"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",  # 忽略 .env 中未声明的变量，避免 ValidationError
+    )
+
+    # 应用配置
+    DEBUG: bool = False
+
+    # 存储目录
+    STORAGE_DIR: Path = Path("storage")
+    UPLOAD_DIR: Path = Path("storage/uploads")
+    OUTPUT_DIR: Path = Path("storage/outputs")
+
+    # 数据库配置（应用与 Alembic 均使用 asyncpg，此处统一为 postgresql+asyncpg）
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/llm_excel"
+    DATABASE_POOL_SIZE: int = 10
+    DATABASE_MAX_OVERFLOW: int = 20
+
+    @property
+    def DATABASE_URL_ASYNC(self) -> str:
+        """始终返回 postgresql+asyncpg URL，供应用与 Alembic 使用。"""
+        u = self.DATABASE_URL
+        if u.startswith("postgresql://") and "+asyncpg" not in u and "+psycopg" not in u:
+            return u.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return u
+
+    # JWT 配置
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # 密码加密
+    BCRYPT_ROUNDS: int = 12
+
+    # OpenAI 配置（与 llm_client / cli 使用的变量名一致）
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_BASE: Optional[str] = "https://api.openai.com/v1"
+    OPENAI_BASE_URL: Optional[str] = None  # 兼容 .env 中的旧变量名
+    OPENAI_MODEL: Optional[str] = None
+
+
+settings = Settings()
+
+# 模块级别的导出，方便直接导入使用
+STORAGE_DIR = settings.STORAGE_DIR
+UPLOAD_DIR = settings.UPLOAD_DIR
+OUTPUT_DIR = settings.OUTPUT_DIR
 
 
 def init_dirs():
     """初始化目录"""
-    STORAGE_DIR.mkdir(exist_ok=True)
-    UPLOAD_DIR.mkdir(exist_ok=True)
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    settings.STORAGE_DIR.mkdir(exist_ok=True)
+    settings.UPLOAD_DIR.mkdir(exist_ok=True)
+    settings.OUTPUT_DIR.mkdir(exist_ok=True)
