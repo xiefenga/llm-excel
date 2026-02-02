@@ -34,13 +34,9 @@ const ThreadChat = () => {
     onStart: () => {
       setQuery("");
     },
-    onExecuteSuccess: (newOutputFile, formulas, newThreadId) => {
+    onExecuteSuccess: (newOutputFile) => {
       setLeftPanelTab("output");
       setOutputFile(newOutputFile);
-      // 如果有新的 thread_id，跳转到详情页
-      if (newThreadId && !threadId) {
-        navigate(`/threads/${newThreadId}`);
-      }
     },
     onRefreshThread: () => {
       queryClient.invalidateQueries({ queryKey: ['threads'] })

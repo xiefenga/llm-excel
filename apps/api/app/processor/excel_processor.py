@@ -228,7 +228,8 @@ class ExcelProcessor:
             # 验证错误会传递给 execute 阶段处理
 
         elif stage == ProcessStage.EXECUTE:
-            result.formulas = output.get("formulas")
+            result.strategy = output.get("strategy")
+            result.manual_steps = output.get("manual_steps")
             result.variables = output.get("variables") or {}
             result.new_columns = output.get("new_columns") or {}
             result.updated_columns = output.get("updated_columns") or {}

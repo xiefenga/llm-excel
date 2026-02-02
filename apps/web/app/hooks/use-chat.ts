@@ -209,13 +209,7 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExecuteS
                   };
                   assistantMsg.steps[existingStepIndex] = doneStep;
 
-                  // 如果是 execute 步骤完成，触发回调
-                  if (step === "execute" && output) {
-                    const execOutput = output as {
-                      output_file?: string;
-                      formulas?: unknown[];
-                    };
-                  }
+                  // execute 步骤完成时的处理已在上方通过 onExecuteSuccess 回调处理
                 }
                 break;
               }

@@ -29,7 +29,8 @@ export interface SSEMessage {
     content?: string | Record<string, unknown>;
     message?: string;
     output_file?: string;
-    formulas?: string;
+    strategy?: string;
+    manual_steps?: string;
     turn_id?: string;
     thread_id?: string;
   };
@@ -174,7 +175,7 @@ export const runFixtureCase = ({ scenarioId, caseId, streamLlm = true, events: {
 
         try {
           const data = JSON.parse(event.data);
-          
+
           // 根据 event.event 分发不同的处理器
           switch (event.event) {
             case "meta":

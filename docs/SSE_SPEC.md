@@ -1,6 +1,6 @@
 # SSE 事件协议规范
 
-本文档定义了 `/chat` 接口的 SSE (Server-Sent Events) 事件协议。
+本文档定义了 `/chat` 和 `/fixture/run` 接口的 SSE (Server-Sent Events) 事件协议。
 
 ## 一、协议概述
 
@@ -15,7 +15,7 @@
 
 | event 字段  | 用途              | 触发时机                                          |
 | ----------- | ----------------- | ------------------------------------------------- |
-| `session`   | 会话元数据        | 会话/消息创建完成后                               |
+| `session`   | 会话元数据        | 会话/消息创建完成后（仅 `/chat` 接口）            |
 | `error`     | 会话级/系统级错误 | 会话创建失败、系统异常                            |
 | _(default)_ | 业务流程步骤      | 处理过程中（不指定 event，使用默认 message 事件） |
 
@@ -23,7 +23,7 @@
 
 ## 二、事件详细定义
 
-### 2.1 Session 事件
+### 2.1 Session 事件（仅 /chat 接口）
 
 会话和消息数据创建完成后发送，表示"聊天已开始"。
 
@@ -54,38 +54,39 @@ data: {
 
 ```json
 {
-  "step": "load | analyze | generate | validate | execute",
+  "step": "load | generate | execute | export | complete",
   "status": "running | streaming | done | error",
   "stage_id": "uuid-string",
   "delta": "增量内容（streaming 时）",
   "output": { ... },
-  "error": { "code": "...", "message": "..." }
+  "error": "错误描述"
 }
 ```
 
-| 字段       | 类型   | 说明                                           |
-| ---------- | ------ | ---------------------------------------------- |
-| `step`     | string | 当前步骤名称                                   |
-| `status`   | string | 步骤状态                                       |
-| `stage_id` | string | 阶段实例唯一标识（重试时每次生成新 id）        |
-| `delta`    | string | 增量内容（仅 `streaming` 状态）                |
-| `output`   | object | 完整输出（仅 `done` 状态）                     |
-| `error`    | object | 错误信息（仅 `error` 状态）                    |
+| 字段       | 类型   | 说明                                    |
+| ---------- | ------ | --------------------------------------- |
+| `step`     | string | 当前步骤名称                            |
+| `status`   | string | 步骤状态                                |
+| `stage_id` | string | 阶段实例唯一标识（重试时每次生成新 id） |
+| `delta`    | string | 增量内容（仅 `streaming` 状态）         |
+| `output`   | object | 完整输出（仅 `done` 状态）              |
+| `error`    | string | 错误描述（仅 `error` 状态）             |
 
 **关于 stage_id**：
+
 - 每个阶段实例都有唯一的 `stage_id`
 - 同一 `stage_id` 的事件属于同一次执行（running → streaming → done/error）
-- 验证失败重试时，会生成新的 `stage_id`，前端可据此区分不同尝试
+- 重试时会生成新的 `stage_id`，前端可据此区分不同尝试
 
 #### 步骤定义
 
-| step       | 说明     | output 内容                                              |
-| ---------- | -------- | -------------------------------------------------------- |
-| `load`     | 加载文件 | `{ "schemas": [...] }`                                   |
-| `analyze`  | 需求分析 | `{ "content": "分析结果" }`                              |
-| `generate` | 生成操作 | `{ "operations": [...] }`                                |
-| `validate` | 验证操作 | `{ "valid": true, "operation_count": 3, "errors": [] }`  |
-| `execute`  | 执行操作 | `{ "formulas": [...], "output_file": "..." }`            |
+| step       | 说明     | output 内容                                                     |
+| ---------- | -------- | --------------------------------------------------------------- |
+| `load`     | 加载文件 | `{ "files": [...] }`                                            |
+| `generate` | 生成操作 | `{ "operations": [...] }`                                       |
+| `execute`  | 执行操作 | `{ "strategy": "...", "manual_steps": "...", "errors": [...] }` |
+| `export`   | 导出结果 | `{ "output_files": [...] }`                                     |
+| `complete` | 流程完成 | `{ "success": true, "errors": null }`                           |
 
 #### 状态流转
 
@@ -109,50 +110,68 @@ running → streaming → error   (流式输出中失败)
 
 ```
 data: { "step": "load", "stage_id": "a1b2c3...", "status": "running" }
-data: { "step": "load", "stage_id": "a1b2c3...", "status": "done", "output": { "schemas": [...] } }
+data: { "step": "load", "stage_id": "a1b2c3...", "status": "done", "output": { "files": [...] } }
 
-data: { "step": "analyze", "stage_id": "d4e5f6...", "status": "running" }
-data: { "step": "analyze", "stage_id": "d4e5f6...", "status": "streaming", "delta": "首先" }
-data: { "step": "analyze", "stage_id": "d4e5f6...", "status": "streaming", "delta": "，我们需要" }
-data: { "step": "analyze", "stage_id": "d4e5f6...", "status": "done", "output": { "content": "完整分析内容" } }
+data: { "step": "generate", "stage_id": "d4e5f6...", "status": "running" }
+data: { "step": "generate", "stage_id": "d4e5f6...", "status": "streaming", "delta": "正在分析" }
+data: { "step": "generate", "stage_id": "d4e5f6...", "status": "done", "output": { "operations": [...] } }
 
-data: { "step": "generate", "stage_id": "g7h8i9...", "status": "running" }
-data: { "step": "generate", "stage_id": "g7h8i9...", "status": "done", "output": { "operations": [...] } }
+data: { "step": "execute", "stage_id": "g7h8i9...", "status": "running" }
+data: { "step": "execute", "stage_id": "g7h8i9...", "status": "done", "output": { "strategy": "...", "manual_steps": "...", "errors": null } }
 
-data: { "step": "validate", "stage_id": "j1k2l3...", "status": "running" }
-data: { "step": "validate", "stage_id": "j1k2l3...", "status": "done", "output": { "valid": true, "operation_count": 3 } }
+data: { "step": "export", "stage_id": "j1k2l3...", "status": "running" }
+data: { "step": "export", "stage_id": "j1k2l3...", "status": "done", "output": { "output_files": [...] } }
 
-data: { "step": "execute", "stage_id": "m4n5o6...", "status": "running" }
-data: { "step": "execute", "stage_id": "m4n5o6...", "status": "done", "output": { "formulas": [...], "output_file": "result.xlsx" } }
-
-data: { "step": "complete", "status": "done" }
-```
-
-#### 验证重试示例
-
-当验证失败时，会重新生成操作，每次生成新的 `stage_id`：
-
-```
-// 第一次尝试
-data: { "step": "generate", "stage_id": "gen-001...", "status": "running" }
-data: { "step": "generate", "stage_id": "gen-001...", "status": "done", "output": { "operations": [...] } }
-data: { "step": "validate", "stage_id": "val-001...", "status": "running" }
-data: { "step": "validate", "stage_id": "val-001...", "status": "done", "output": { "valid": false, "errors": ["列名不存在: Age"] } }
-
-// 第二次尝试（重试）
-data: { "step": "generate", "stage_id": "gen-002...", "status": "running" }
-data: { "step": "generate", "stage_id": "gen-002...", "status": "done", "output": { "operations": [...] } }
-data: { "step": "validate", "stage_id": "val-002...", "status": "running" }
-data: { "step": "validate", "stage_id": "val-002...", "status": "done", "output": { "valid": true, "operation_count": 3 } }
-
-// 继续执行
-data: { "step": "execute", "stage_id": "exec-001...", "status": "running" }
-data: { "step": "execute", "stage_id": "exec-001...", "status": "done", "output": { ... } }
+data: { "step": "complete", "status": "done", "output": { "success": true, "errors": null } }
 ```
 
 ---
 
-### 2.3 Complete 事件
+### 2.3 Load 步骤 Output 详情
+
+```json
+{
+  "files": [
+    {
+      "file_id": "xxx",
+      "filename": "orders.xlsx",
+      "sheets": [
+        {
+          "name": "Sheet1",
+          "row_count": 100,
+          "columns": [
+            { "name": "订单号", "letter": "A", "type": "text" },
+            { "name": "金额", "letter": "B", "type": "number" },
+            { "name": "日期", "letter": "C", "type": "date" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+列类型 `type` 可选值：`text`, `number`, `date`, `boolean`
+
+---
+
+### 2.4 Export 步骤 Output 详情
+
+```json
+{
+  "output_files": [
+    {
+      "file_id": "xxx",
+      "filename": "orders.xlsx",
+      "url": "https://oss.example.com/outputs/xxx/orders.xlsx"
+    }
+  ]
+}
+```
+
+---
+
+### 2.5 Complete 步骤
 
 整个流程结束的显式信号。
 
@@ -161,17 +180,22 @@ data: { "step": "execute", "stage_id": "exec-001...", "status": "done", "output"
   "step": "complete",
   "status": "done",
   "output": {
-    "thread_id": "uuid",
-    "turn_id": "uuid"
+    "success": true,
+    "errors": null
   }
 }
 ```
+
+| 字段      | 类型    | 说明                      |
+| --------- | ------- | ------------------------- |
+| `success` | boolean | 是否成功完成              |
+| `errors`  | array   | 错误列表（成功时为 null） |
 
 **注意**：`complete` 是一个特殊的 step，表示所有业务步骤已完成。
 
 ---
 
-### 2.4 Error 事件
+### 2.6 Error 事件
 
 会话级或系统级错误，使用 `event: error`。
 
@@ -183,12 +207,12 @@ data: {
 }
 ```
 
-| 字段      | 类型   | 说明     |
-| --------- | ------ | -------- |
-| `code`    | string | 错误码   |
-| `message` | string | 错误描述 |
+| 字段      | 类型   | 说明                      |
+| --------- | ------ | ------------------------- |
+| `code`    | string | 错误码（仅 /chat 接口有） |
+| `message` | string | 错误描述                  |
 
-#### 错误码定义
+#### 错误码定义（/chat 接口）
 
 | code               | 说明       | 触发场景                          |
 | ------------------ | ---------- | --------------------------------- |
@@ -203,82 +227,83 @@ data: {
 
 ### 3.1 错误分类
 
-| 类型           | 处理方式        | 示例                    |
-| -------------- | --------------- | ----------------------- |
-| **会话级错误** | `event: error`  | 会话不存在、文件无权限  |
-| **步骤级错误** | `status: error` | LLM 超时、JSON 解析失败 |
-| **系统级错误** | `event: error`  | 数据库异常、未捕获错误  |
+| 类型           | 处理方式        | 示例                   |
+| -------------- | --------------- | ---------------------- |
+| **会话级错误** | `event: error`  | 会话不存在、文件无权限 |
+| **步骤级错误** | `status: error` | LLM 超时、执行失败     |
+| **系统级错误** | `event: error`  | 数据库异常、未捕获错误 |
 
 ### 3.2 步骤失败处理
 
-步骤失败后，流程立即停止，不会继续执行后续步骤。
+步骤失败后，发送 `complete` 事件标记流程结束：
 
 ```
-data: { "step": "analyze", "status": "running" }
-data: { "step": "analyze", "status": "error", "error": { "code": "LLM_TIMEOUT", "message": "LLM 请求超时" } }
-// 流程结束，不会有 generate/execute 步骤
+data: { "step": "generate", "stage_id": "xxx", "status": "running" }
+data: { "step": "generate", "stage_id": "xxx", "status": "error", "error": "LLM 请求超时" }
+data: { "step": "complete", "status": "done", "output": { "success": false, "errors": ["LLM 请求超时"] } }
 ```
-
-### 3.3 步骤错误码
-
-| code                | 说明          |
-| ------------------- | ------------- |
-| `LOAD_FAILED`       | 文件加载失败  |
-| `LLM_TIMEOUT`       | LLM 请求超时  |
-| `LLM_ERROR`         | LLM 调用失败  |
-| `PARSE_FAILED`      | JSON 解析失败 |
-| `VALIDATION_FAILED` | 操作校验失败  |
-| `EXECUTE_FAILED`    | 执行失败      |
 
 ---
 
 ## 四、完整事件流示例
 
-### 4.1 成功流程
+### 4.1 成功流程（/chat 接口）
 
 ```
 event: session
 data: { "thread_id": "abc", "turn_id": "def", "title": "计算订单总额", "is_new_thread": true }
 
 data: { "step": "load", "stage_id": "load-001", "status": "running" }
-data: { "step": "load", "stage_id": "load-001", "status": "done", "output": { "schemas": [...] } }
+data: { "step": "load", "stage_id": "load-001", "status": "done", "output": { "files": [...] } }
 
-data: { "step": "analyze", "stage_id": "ana-001", "status": "running" }
-data: { "step": "analyze", "stage_id": "ana-001", "status": "streaming", "delta": "根据需求..." }
-data: { "step": "analyze", "stage_id": "ana-001", "status": "done", "output": { "content": "完整分析" } }
+data: { "step": "generate", "stage_id": "gen-001", "status": "running" }
+data: { "step": "generate", "stage_id": "gen-001", "status": "streaming", "delta": "正在分析..." }
+data: { "step": "generate", "stage_id": "gen-001", "status": "done", "output": { "operations": [...] } }
+
+data: { "step": "execute", "stage_id": "exec-001", "status": "running" }
+data: { "step": "execute", "stage_id": "exec-001", "status": "done", "output": { "strategy": "...", "manual_steps": "...", "errors": null } }
+
+data: { "step": "export", "stage_id": "exp-001", "status": "running" }
+data: { "step": "export", "stage_id": "exp-001", "status": "done", "output": { "output_files": [...] } }
+
+data: { "step": "complete", "status": "done", "output": { "success": true, "errors": null } }
+```
+
+### 4.2 成功流程（/fixture/run 接口）
+
+```
+data: { "step": "load", "stage_id": "load-001", "status": "running" }
+data: { "step": "load", "stage_id": "load-001", "status": "done", "output": { "files": [...] } }
 
 data: { "step": "generate", "stage_id": "gen-001", "status": "running" }
 data: { "step": "generate", "stage_id": "gen-001", "status": "done", "output": { "operations": [...] } }
 
-data: { "step": "validate", "stage_id": "val-001", "status": "running" }
-data: { "step": "validate", "stage_id": "val-001", "status": "done", "output": { "valid": true, "operation_count": 3 } }
-
 data: { "step": "execute", "stage_id": "exec-001", "status": "running" }
-data: { "step": "execute", "stage_id": "exec-001", "status": "done", "output": { "formulas": [...], "output_file": "result.xlsx" } }
+data: { "step": "execute", "stage_id": "exec-001", "status": "done", "output": { "strategy": "...", "manual_steps": "...", "errors": null } }
 
-data: { "step": "complete", "status": "done", "output": { "thread_id": "abc", "turn_id": "def" } }
+data: { "step": "export", "stage_id": "exp-001", "status": "running" }
+data: { "step": "export", "stage_id": "exp-001", "status": "done", "output": { "output_files": [...] } }
+
+data: { "step": "complete", "status": "done", "output": { "success": true, "errors": null } }
 ```
 
-### 4.2 步骤失败
+### 4.3 步骤失败
 
 ```
-event: session
-data: { "thread_id": "abc", "turn_id": "def", "title": "...", "is_new_thread": false }
+data: { "step": "load", "stage_id": "load-001", "status": "running" }
+data: { "step": "load", "stage_id": "load-001", "status": "done", "output": { "files": [...] } }
 
-data: { "step": "load", "status": "running" }
-data: { "step": "load", "status": "done", "output": { "schemas": [...] } }
+data: { "step": "generate", "stage_id": "gen-001", "status": "running" }
+data: { "step": "generate", "stage_id": "gen-001", "status": "error", "error": "LLM 请求超时，请重试" }
 
-data: { "step": "analyze", "status": "running" }
-data: { "step": "analyze", "status": "error", "error": { "code": "LLM_TIMEOUT", "message": "LLM 请求超时，请重试" } }
-// 流程结束
+data: { "step": "complete", "status": "done", "output": { "success": false, "errors": ["LLM 请求超时，请重试"] } }
 ```
 
-### 4.3 会话级错误
+### 4.4 会话级错误（/chat 接口）
 
 ```
 event: error
 data: { "code": "FILE_NOT_FOUND", "message": "文件不存在或无权访问: abc-123" }
-// 流程结束
 ```
 
 ---
@@ -290,7 +315,7 @@ data: { "code": "FILE_NOT_FOUND", "message": "文件不存在或无权访问: ab
 ```javascript
 const eventSource = new EventSource("/chat");
 
-// 会话创建
+// 会话创建（仅 /chat 接口）
 eventSource.addEventListener("session", (e) => {
   const data = JSON.parse(e.data);
   updateThreadInfo(data.thread_id, data.title);
@@ -305,7 +330,7 @@ eventSource.onmessage = (e) => {
 // 错误
 eventSource.addEventListener("error", (e) => {
   const data = JSON.parse(e.data);
-  showError(data.code, data.message);
+  showError(data.message);
 });
 ```
 
@@ -322,7 +347,7 @@ function handleStep(step, status, data) {
       break;
     case "done":
       if (step === "complete") {
-        onComplete(data.output);
+        onComplete(data.output.success, data.output.errors);
       } else {
         setContent(step, data.output);
         hideLoading(step);
@@ -339,6 +364,7 @@ function handleStep(step, status, data) {
 
 ## 六、版本历史
 
-| 版本 | 日期       | 变更     |
-| ---- | ---------- | -------- |
-| 1.0  | 2025-01-28 | 初始版本 |
+| 版本 | 日期       | 变更                                                          |
+| ---- | ---------- | ------------------------------------------------------------- |
+| 2.0  | 2025-02-02 | 统一 /chat 和 /fixture 接口；简化 step 命名；更新 output 格式 |
+| 1.0  | 2025-01-28 | 初始版本                                                      |

@@ -18,25 +18,25 @@ cases:
   - id: "basic-join"
     name: "基础信息关联"
     prompt: |
-      Sheet1 是比赛结果。请通过 driverId 从 Sheet2 中匹配对应的 driverRef 和 nationality。结果写入 Sheet1 新列。
+      results 是比赛结果。请通过 driverId 从 drivers 中匹配对应的 driverRef 和 nationality。结果写入 results 新列。
     tags: ["跨表关联", "VLOOKUP"]
 
   - id: "champion-query"
     name: "冠军查询"
     prompt: |
-      在 Sheet1 中筛选出 positionOrder 为 1（冠军）的记录，关联 Sheet2 获取车手姓名。结果写入一个新 Sheet。
+      在 results 中筛选出 positionOrder 为 1（冠军）的记录，关联 drivers 获取车手姓名。结果写入一个新 Sheet。
     tags: ["筛选", "关联", "新Sheet"]
 
   - id: "nationality-wins"
     name: "按国籍统计胜场"
     prompt: |
-      先关联表。筛选出冠军（positionOrder=1），按 nationality 分组统计夺冠次数。结果生成一个新表。
+      先关联表(results 和 drivers 表通过 driverId 关联)。筛选出冠军（positionOrder=1），按 nationality 分组统计夺冠次数。结果生成一个新表。
     tags: ["分组", "计数", "筛选"]
 
   - id: "driver-record"
     name: "特定车手战绩"
     prompt: |
-      找出 Sheet2 中 driverRef 为 'hamilton' 的 ID，去 Sheet1 筛选该 ID 的所有记录。结果写入新 Sheet。
+      找出 drivers 中 driverRef 为 'hamilton' 的 ID，去 results 筛选该 ID 的所有记录。结果写入新 Sheet。
     tags: ["查找", "筛选"]
 
   - id: "total-points"
@@ -48,5 +48,5 @@ cases:
   - id: "id-consistency"
     name: "车手ID一致性验证"
     prompt: |
-      统计 Sheet1 中有多少个不同的 driverId，并统计 Sheet2 中有多少个 driverId，计算两者的差值。结果输出到新 Sheet。
+      统计 results 中有多少个不同的 driverId，并统计 drivers 中有多少个 driverId，计算两者的差值。结果输出到新 Sheet。
     tags: ["统计", "去重", "对比"]

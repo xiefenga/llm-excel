@@ -17,7 +17,7 @@ class ExecuteStage(Stage):
     """
     执行操作阶段
 
-    执行已验证的操作，生成 Excel 公式。
+    执行已验证的操作，生成思路解读和快捷复现。
 
     输入:
         - tables: 表集合
@@ -25,7 +25,8 @@ class ExecuteStage(Stage):
 
     输出:
         {
-            "formulas": "公式字符串",
+            "strategy": "思路解读",
+            "manual_steps": "快捷复现",
             "variables": {...},
             "new_columns": {...},
             "updated_columns": {...},
@@ -63,7 +64,6 @@ class ExecuteStage(Stage):
         raw_new_columns: Dict = {}
         raw_updated_columns: Dict = {}
         raw_new_sheets: Dict = {}  # 新创建的 Sheet 完整数据
-        formulas = None
 
         try:
             # 执行操作（仅当验证通过时）
@@ -114,21 +114,29 @@ class ExecuteStage(Stage):
 
                 errors.extend(exec_result.errors)
 
-            # 3. 生成公式
+            # 3. 生成输出（思路解读、快捷复现）
+            strategy = None
+            manual_steps = None
+
             if operations:
                 try:
-                    from app.engine.excel_generator import (
-                        generate_formulas,
-                        format_formula_output,
+                    from app.engine.output_generator import (
+                        generate_strategy,
+                        generate_manual_steps,
                     )
 
-                    excel_formulas = generate_formulas(operations, tables)
-                    formulas = format_formula_output(excel_formulas)
+                    # 生成思路解读
+                    strategy = generate_strategy(operations, tables)
+
+                    # 生成快捷复现
+                    manual_steps = generate_manual_steps(operations, tables)
+
                 except Exception as e:
-                    logger.warning(f"生成公式失败: {e}")
+                    logger.warning(f"生成输出失败: {e}")
 
             output = {
-                "formulas": formulas,
+                "strategy": strategy,
+                "manual_steps": manual_steps,
                 "variables": variables if variables else None,
                 "new_columns": new_columns if new_columns else None,
                 "updated_columns": updated_columns if updated_columns else None,
@@ -141,7 +149,8 @@ class ExecuteStage(Stage):
 
             yield self._event_done(
                 {
-                    "formulas": formulas,
+                    "strategy": strategy,
+                    "manual_steps": manual_steps,
                     "errors": errors if errors else None,
                 },
                 stage_id,

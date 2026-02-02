@@ -103,7 +103,8 @@ class ProcessResult:
     Attributes:
         analysis: 需求分析结果（LLM 输出）
         operations: 生成的操作（JSON 结构）
-        formulas: Excel 公式（格式化后的字符串）
+        strategy: 思路解读（让用户理解系统准备怎么操作）
+        manual_steps: 快捷复现（用户手动操作 Excel 的步骤指南）
         variables: 聚合变量结果
         new_columns: 新增列数据（预览，前 10 行）
         updated_columns: 更新列数据（预览，前 10 行）
@@ -115,7 +116,8 @@ class ProcessResult:
     # 各阶段输出
     analysis: Optional[str] = None
     operations: Optional[Dict] = None
-    formulas: Optional[str] = None
+    strategy: Optional[str] = None       # 思路解读
+    manual_steps: Optional[str] = None   # 快捷复现
 
     # 执行结果
     variables: Dict[str, Any] = field(default_factory=dict)
@@ -160,7 +162,8 @@ class ProcessResult:
         return {
             "analysis": self.analysis,
             "operations": self.operations,
-            "formulas": self.formulas,
+            "strategy": self.strategy,
+            "manual_steps": self.manual_steps,
             "variables": self.variables if self.variables else None,
             "new_columns": self.new_columns if self.new_columns else None,
             "updated_columns": self.updated_columns if self.updated_columns else None,
@@ -174,8 +177,10 @@ class ProcessResult:
             parts.append(f"analysis={len(self.analysis)} chars")
         if self.operations:
             parts.append(f"operations={len(self.operations.get('operations', []))} ops")
-        if self.formulas:
-            parts.append("formulas=yes")
+        if self.strategy:
+            parts.append("strategy=yes")
+        if self.manual_steps:
+            parts.append("manual_steps=yes")
         if self.errors:
             parts.append(f"errors={len(self.errors)}")
         return f"ProcessResult({', '.join(parts)})"

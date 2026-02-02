@@ -189,7 +189,7 @@ const FixtureCaseRunPage = () => {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-linear-to-br from-gray-50 via-white to-emerald-50/30">
+    <div className="h-screen flex flex-col overflow-hidden bg-linear-to-br from-gray-50 via-white to-emerald-50/30 px-6">
       {/* Header Area */}
       <div className="shrink-0 pt-6 pb-4 max-w-7xl mx-auto w-full">
 
@@ -304,7 +304,7 @@ const FixtureCaseRunPage = () => {
       </div>
 
       {/* Main Content Area - Flex to fill remaining space */}
-      <div className="flex-1 min-h-0 px-6 pb-6">
+      <div className="flex-1 min-h-0 pb-6">
         <div className="max-w-7xl mx-auto h-full flex gap-6">
           {/* Left: SSE Logs - Takes remaining space */}
           <div className="flex-1 min-w-0 flex flex-col bg-gray-900 rounded-xl overflow-hidden shadow-lg">

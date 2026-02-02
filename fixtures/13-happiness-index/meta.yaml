@@ -3,28 +3,22 @@ name: "全球幸福指数报告"
 description: "全球幸福指数多年数据，用于测试跨表计算、对比分析、分组统计等场景"
 
 datasets:
-  - file: "2015.xlsx"
+  - file: "2015年幸福指数数据.xlsx"
     description: "2015年幸福指数数据"
-  - file: "2016.xlsx"
+  - file: "2016年幸福指数数据.xlsx"
     description: "2016年幸福指数数据"
-
-schema:
-  - sheet: "Sheet1 (2015)"
-    columns: ["Country", "Happiness Score", "Region"]
-  - sheet: "Sheet2 (2016)"
-    columns: ["Country", "Happiness Score", "Region"]
 
 cases:
   - id: "cross-table-diff"
     name: "跨表差值计算"
     prompt: |
-      遍历 Sheet2 的国家，去 Sheet1 查找对应分数。计算 2016 分数减去 2015 分数的差值。生成新表包含：Country, 2016_Score, Score_Change。
+      遍历 2016年幸福指数数据 的国家，去 2015年幸福指数数据 查找对应分数。计算 2016 分数减去 2015 分数的差值。生成新表包含：Country, 2016_Score, Score_Change。
     tags: ["跨表计算", "VLOOKUP", "差值"]
 
   - id: "rank-drop"
     name: "排名下降国家"
     prompt: |
-      对比两表，筛选出 Sheet2 分数低于 Sheet1 的国家。将国家名和两年分数写入新 Sheet。
+      对比两表，筛选出 2016年幸福指数数据 分数低于 2015年幸福指数数据 的国家。将国家名和两年分数写入新 Sheet。
     tags: ["跨表对比", "筛选"]
 
   - id: "region-avg"

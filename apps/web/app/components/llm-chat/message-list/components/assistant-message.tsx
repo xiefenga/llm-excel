@@ -166,16 +166,38 @@ const StepItem = ({ record, defaultExpanded = false }: StepItemProps) => {
 
     if (stepName === "execute") {
       const output = doneRecord.output as ExecuteStepOutput;
-      const { formulas, output_file } = output;
+      const { strategy, manual_steps, output_file } = output;
       return (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* 输出文件 */}
           <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
             <FileSpreadsheet className="w-4 h-4" />
             <span className="text-sm font-medium">{output_file}</span>
           </div>
-          <pre className='text-sm'>
-            {formulas}
-          </pre>
+
+          {/* 思路解读 */}
+          {strategy && (
+            <div className="border border-blue-200 rounded-lg overflow-hidden">
+              <div className="bg-blue-50 px-3 py-2 border-b border-blue-200">
+                <span className="text-sm font-medium text-blue-700">思路解读</span>
+              </div>
+              <pre className="text-sm p-3 whitespace-pre-wrap font-sans text-gray-700">
+                {strategy}
+              </pre>
+            </div>
+          )}
+
+          {/* 快捷复现 */}
+          {manual_steps && (
+            <details className="border border-amber-200 rounded-lg overflow-hidden">
+              <summary className="bg-amber-50 px-3 py-2 cursor-pointer text-sm font-medium text-amber-700 hover:bg-amber-100">
+                快捷复现（点击展开）
+              </summary>
+              <pre className="text-sm p-3 whitespace-pre-wrap font-sans text-gray-700 border-t border-amber-200">
+                {manual_steps}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }

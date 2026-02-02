@@ -66,9 +66,11 @@
 │   └────────────────┘  └────────────────┘  └────────────────┘       │
 │                                                                     │
 │   ┌────────────────┐  ┌────────────────┐                           │
-│   │excel_generator │  │  excel_parser  │                           │
+│   │output_generator│  │  excel_parser  │                           │
 │   │.generate_      │  │  .parse_file() │                           │
-│   │  formulas()    │  │               │                           │
+│   │  strategy()    │  │               │                           │
+│   │.generate_      │  │               │                           │
+│   │  manual_steps()│  │               │                           │
 │   └────────────────┘  └────────────────┘                           │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -126,12 +128,15 @@ class ProcessConfig:
 class ProcessResult:
     analysis: Optional[str]                    # 需求分析结果
     operations: Optional[Dict]                 # 生成的操作
-    formulas: Optional[str]                    # Excel 公式
+    strategy: Optional[str]                    # 思路解读
+    manual_steps: Optional[str]                # 快捷复现
     variables: Dict[str, Any]                  # 聚合变量
     new_columns: Dict[str, Dict[str, List]]   # 新增列（预览）
     modified_tables: Optional[FileCollection]  # 修改后的表
     errors: List[str]                          # 错误列表
 ```
+
+**输出生成说明**：详见 [OUTPUT_GENERATION.md](./OUTPUT_GENERATION.md)
 
 ## ExcelProcessor API
 
@@ -234,7 +239,7 @@ apps/api/app/
 │   ├── llm_client.py             # LLM 客户端
 │   ├── parser.py                 # JSON 操作解析器
 │   ├── executor.py               # 操作执行引擎
-│   ├── excel_generator.py        # Excel 公式生成器
+│   ├── output_generator.py       # 输出生成器（思路解读 + 快捷复现）
 │   ├── excel_parser.py           # Excel 文件解析器
 │   ├── functions.py              # Excel 函数实现
 │   ├── prompt.py                 # LLM 提示词

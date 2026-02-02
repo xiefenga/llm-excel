@@ -31,12 +31,16 @@ class ProcessResult:
 def load_tables_from_files(files: List[File]) -> FileCollection:
     """从文件记录加载表（内部通过 ExcelParser 使用 MinIO 解析）"""
     # 将数据库记录转换为 (file_id, file_path, filename) 形式，传给解析器
+    # 使用文件名（不含扩展名）作为 file_id，这样 LLM 提示词中使用的是用户熟悉的文件名
     file_records = []
     for f in files:
+        filename = f.filename or Path(f.file_path).name
+        # 去掉扩展名作为 file_id
+        file_id = Path(filename).stem
         file_records.append((
-            str(f.id),  # file_id
+            file_id,  # file_id 使用文件名（不含扩展名）
             f.file_path,  # MinIO 公共路径
-            f.filename or Path(f.file_path).name  # 原始文件名
+            filename  # 原始文件名
         ))
 
     try:

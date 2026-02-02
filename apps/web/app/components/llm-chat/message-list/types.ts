@@ -48,7 +48,8 @@ export interface GenerateStepOutput {
 
 /** execute 步骤输出 */
 export interface ExecuteStepOutput {
-  formulas: string;
+  strategy?: string;        // 思路解读
+  manual_steps?: string;    // 快捷复现
   output_file: string;
   variables?: Record<string, unknown>;
   new_columns?: Record<string, unknown>;

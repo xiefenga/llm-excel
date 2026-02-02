@@ -585,10 +585,46 @@ class ExecutionResult:
 
 ---
 
+---
+
+### 9. **OutputGenerator** - 输出生成器
+
+**职责**：将执行结果转换为用户友好的三种输出格式
+
+**核心函数**：
+
+```python
+def generate_strategy(operations: List, tables: FileCollection) -> str
+    """生成思路解读：让用户理解系统'准备怎么操作'"""
+
+def generate_manual_steps(operations: List, tables: FileCollection) -> str
+    """生成快捷复现：用户手动操作 Excel 的步骤指南"""
+```
+
+**输出格式**：
+
+| 输出       | 目的             | 内容                           |
+| ---------- | ---------------- | ------------------------------ |
+| 思路解读   | 验证思路是否正确 | 步骤概要 + 操作方法            |
+| 快捷复现   | 手动复现         | 具体操作步骤（区分 365/非365） |
+| Excel 公式 | 精确复现         | 公式模板（已有）               |
+
+**设计要点**：
+
+- **分工合作**：LLM 的 `description` 说明"做什么"，系统解析技术细节说明"怎么做"
+- **版本适配**：高级操作（filter, sort, group_by, take）提供两种复现方式
+  - 非 365：菜单操作步骤（优先展示）
+  - 365：公式方式
+
+详见 [OUTPUT_GENERATION.md](./OUTPUT_GENERATION.md)
+
+---
+
 ## 📚 扩展阅读
 
 - **操作规范**：详见 `docs/OPERATION_SPEC.md`
 - **处理器设计**：详见 `docs/PROCESSOR_DESIGN.md`
+- **输出生成**：详见 `docs/OUTPUT_GENERATION.md`
 - **使用示例**：详见 `apps/api/cli.py`
 
 ---
@@ -638,6 +674,163 @@ class ExecutionResult:
 
 ---
 
+## 🔢 数据类型处理
+
+本节说明系统如何处理 Excel 数据在不同层级的类型转换和兼容性问题。
+
+### 三层类型映射
+
+数据在系统中经历三层类型转换：
+
+```
+Excel 文件 → pandas DataFrame → 系统执行
+```
+
+| Excel 数据       | pandas dtype     | 系统类型  | 说明                                   |
+| ---------------- | ---------------- | --------- | -------------------------------------- |
+| 纯整数（无空值） | `int64`          | `number`  |                                        |
+| 纯整数（有空值） | `float64`        | `number`  | NaN 是 float，导致类型变化             |
+| 小数             | `float64`        | `number`  |                                        |
+| 纯文本           | `object`         | `text`    |                                        |
+| 混合内容         | `object`         | `mixed`   | **问题根源**：同列包含 str、int、float |
+| 日期             | `datetime64[ns]` | `date`    |                                        |
+| 布尔             | `bool`           | `boolean` |                                        |
+
+### 增强 Schema 格式
+
+`FileCollection.get_schemas_with_samples()` 返回包含类型和样本的增强结构：
+
+```python
+{
+    "file_id": {
+        "sheet_name": [
+            {"name": "列名", "type": "number", "samples": [100, 200, 300]},
+            {"name": "wage", "type": "mixed", "samples": ["€150K", "€200K"]},
+            ...
+        ]
+    }
+}
+```
+
+**类型检测逻辑**（针对 `object` 类型列）：
+
+```python
+# 采样前 100 个非空值
+if 数值占比 > 80%:
+    return "number"
+elif 文本占比 > 80%:
+    return "text"
+elif 数值和文本都有:
+    return "mixed"  # 提醒 LLM 注意混合类型
+```
+
+### 执行器类型安全处理
+
+#### 1. 比较运算符 (`>`, `<`, `>=`, `<=`)
+
+**问题**：`"100" > 50` 会抛出 `TypeError`
+
+**解决方案**：
+
+```python
+def safe_compare(a, b, compare_func):
+    # 1. 尝试将两边都转为数值
+    a_num = try_convert_to_number(a)
+    b_num = try_convert_to_number(b)
+
+    if 两边都是数值:
+        return compare_func(a_num, b_num)
+
+    # 2. 模拟 Excel 行为：数值 < 文本
+    if a 是数值 and b 是文本:
+        return True if op == "<" else False
+
+    # 3. 无法比较时返回 False（不报错）
+    return False
+```
+
+#### 2. filter 操作
+
+**问题**：`df[col] > value` 在混合类型列上报错
+
+**解决方案**：
+
+```python
+if value 是数值:
+    # 将列转换为数值后比较
+    col_numeric = pd.to_numeric(df[col], errors="coerce")
+    conditions.append(col_numeric > value)
+else:
+    # 字符串比较
+    conditions.append(df[col].astype(str) > str(value))
+```
+
+#### 3. sort 操作
+
+**问题**：混合类型列无法直接排序
+
+**解决方案**：
+
+```python
+if df[col].dtype == "object":
+    # 尝试转换为数值
+    numeric_col = pd.to_numeric(df[col], errors="coerce")
+    if 超过 50% 能转为数值:
+        # 使用数值排序（非数值放最后）
+        df["_sort_col"] = numeric_col.fillna(float("inf"))
+    else:
+        # 回退到字符串排序
+        df[col] = df[col].astype(str)
+```
+
+### 错误传播机制
+
+当表达式计算中出现错误时，错误会被传播而不是抛出异常：
+
+```python
+def _eval_binary_op(self, op, left_expr, right_expr):
+    left = self.evaluate(left_expr)
+    right = self.evaluate(right_expr)
+
+    # 错误传播：如果任一操作数是 ExcelError，直接返回
+    if isinstance(left, ExcelError):
+        return left
+    if isinstance(right, ExcelError):
+        return right
+
+    # ... 继续计算
+```
+
+**示例**：
+
+```
+height_cm = None
+→ height_cm / 100 = ExcelError("#VALUE!")
+→ ExcelError * ExcelError = ExcelError("#VALUE!")  # 传播，不报错
+```
+
+### LLM 看到的 Schema 格式
+
+```markdown
+#### Sheet: players_22
+
+| 列名       | 类型   | 样本数据                        |
+| ---------- | ------ | ------------------------------- |
+| sofifa_id  | number | 158023, 188545, 190871          |
+| short_name | text   | "L. Messi", "Cristiano Ronaldo" |
+| wage_eur   | mixed  | "€320K", "€270K", null          |
+| height_cm  | number | 170, 187, 175                   |
+| dob        | date   | 1987-06-24, 1985-02-05          |
+```
+
+这样 LLM 可以：
+
+- 看到 `wage_eur` 是 `mixed` 类型，知道需要用 SUBSTITUTE 清理
+- 看到 `height_cm` 是 `number` 类型，可直接运算
+- 看到 `dob` 是 `date` 类型，避免对其做算术运算
+
+---
+
 ## 📝 更新日志
 
 ### 2026-01-30 改进
@@ -651,12 +844,12 @@ class ExecutionResult:
 
 添加以下函数支持空值判断：
 
-| 函数 | 说明 | Excel 对应 |
-|------|------|-----------|
-| `ISBLANK` | 判断空值（None、NaN、空字符串） | `=ISBLANK()` |
-| `ISNA` | 判断 #N/A 或 NaN | `=ISNA()` |
-| `ISNUMBER` | 判断有效数值 | `=ISNUMBER()` |
-| `ISERROR` | 判断错误值 | `=ISERROR()` |
+| 函数       | 说明                            | Excel 对应    |
+| ---------- | ------------------------------- | ------------- |
+| `ISBLANK`  | 判断空值（None、NaN、空字符串） | `=ISBLANK()`  |
+| `ISNA`     | 判断 #N/A 或 NaN                | `=ISNA()`     |
+| `ISNUMBER` | 判断有效数值                    | `=ISNUMBER()` |
+| `ISERROR`  | 判断错误值                      | `=ISERROR()`  |
 
 #### 3. 修复聚合函数
 
@@ -687,9 +880,9 @@ evaluator.row_context = self.variables.copy()
 }
 ```
 
-| 操作 | 目标列 | 用途 |
-|------|--------|------|
-| `add_column` | 必须不存在 | 新增计算列 |
+| 操作            | 目标列     | 用途       |
+| --------------- | ---------- | ---------- |
+| `add_column`    | 必须不存在 | 新增计算列 |
 | `update_column` | 必须已存在 | 修改现有列 |
 
 #### 6. 添加表达式验证器
@@ -716,9 +909,9 @@ errors = validator.validate(formula)
 
 添加以下函数支持文本位置查找：
 
-| 函数 | 说明 | Excel 对应 |
-|------|------|-----------|
-| `FIND` | 查找文本位置（区分大小写） | `=FIND()` |
+| 函数     | 说明                         | Excel 对应  |
+| -------- | ---------------------------- | ----------- |
+| `FIND`   | 查找文本位置（区分大小写）   | `=FIND()`   |
 | `SEARCH` | 查找文本位置（不区分大小写） | `=SEARCH()` |
 
 **用途示例**：从 `"Braund, Mr. Owen"` 提取称谓 `"Mr"`
@@ -727,17 +920,26 @@ errors = validator.validate(formula)
 {
   "func": "MID",
   "args": [
-    {"col": "Name"},
-    {"op": "+",
-     "left": {"func": "FIND", "args": [{"value": ", "}, {"col": "Name"}]},
-     "right": {"value": 2}
+    { "col": "Name" },
+    {
+      "op": "+",
+      "left": {
+        "func": "FIND",
+        "args": [{ "value": ", " }, { "col": "Name" }]
+      },
+      "right": { "value": 2 }
     },
-    {"op": "-",
-     "left": {"func": "FIND", "args": [{"value": "."}, {"col": "Name"}]},
-     "right": {"op": "+",
-               "left": {"func": "FIND", "args": [{"value": ", "}, {"col": "Name"}]},
-               "right": {"value": 1}
-     }
+    {
+      "op": "-",
+      "left": { "func": "FIND", "args": [{ "value": "." }, { "col": "Name" }] },
+      "right": {
+        "op": "+",
+        "left": {
+          "func": "FIND",
+          "args": [{ "value": ", " }, { "col": "Name" }]
+        },
+        "right": { "value": 1 }
+      }
     }
   ]
 }
