@@ -348,6 +348,22 @@ export async function deleteThread(threadId: string): Promise<void> {
   }
 }
 
+// 重命名线程
+export async function renameThread(threadId: string, title: string): Promise<void> {
+  try {
+    const res = await axios.patch<ApiResponse<null>>(`${API_BASE}/threads/${threadId}`, { title });
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "重命名失败");
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "重命名失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("重命名失败");
+  }
+}
+
 interface ProcessExcelOptions {
   body: {
     query: string;

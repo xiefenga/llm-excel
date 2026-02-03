@@ -74,7 +74,7 @@ const LoginPage = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Success Message */}
           {successMessage && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+            <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{successMessage}</span>
             </div>
@@ -82,7 +82,7 @@ const LoginPage = () => {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm animate-in fade-in slide-in-from-top-2">
+            <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm animate-in fade-in slide-in-from-top-2">
               {error}
             </div>
           )}
@@ -100,7 +100,7 @@ const LoginPage = () => {
               onChange={(e) => setAccount(e.target.value)}
               disabled={isLoading}
               required
-              className="h-11 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              className="h-11 border-gray-300 focus:border-brand focus:ring-brand/30"
             />
           </div>
 
@@ -117,7 +117,7 @@ const LoginPage = () => {
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
               required
-              className="h-11 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              className="h-11 border-gray-300 focus:border-brand focus:ring-brand/30"
             />
           </div>
 
@@ -125,7 +125,7 @@ const LoginPage = () => {
           <Button
             type="submit"
             disabled={isLoading || !account || !password}
-            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
+            className="w-full h-11 bg-brand hover:bg-brand-dark text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
           >
             {isLoading ? (
               <>
@@ -147,7 +147,7 @@ const LoginPage = () => {
             还没有账户？{" "}
             <Link
               to="/register"
-              className="text-emerald-600 hover:text-emerald-700 font-semibold underline-offset-4 hover:underline transition-colors"
+              className="text-brand hover:text-brand-dark font-semibold underline-offset-4 hover:underline transition-colors"
             >
               立即注册
             </Link>

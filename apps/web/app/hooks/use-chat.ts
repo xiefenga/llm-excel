@@ -17,7 +17,8 @@ import type {
   RunningStepRecord,
   DoneStepRecord,
   ErrorStepRecord,
-  ExecuteStepOutput,
+  ExportStepOutput,
+  OutputFileInfo,
 } from '~/components/llm-chat/message-list/types';
 import { useAuthStore } from '~/stores/auth';
 
@@ -31,7 +32,7 @@ export interface InputType {
 
 
 /** 步骤名称列表（用于验证） */
-const STEP_NAMES: StepName[] = ["load", "analyze", "generate", "execute"];
+const STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export"];
 
 /** 判断是否为有效的步骤名称 */
 function isStepName(step: string): step is StepName {
@@ -42,10 +43,11 @@ interface UseChatOptions {
   onStart?: () => void;
   initialMessages?: ChatMessage[];
   onSessionCreated?: (data: SessionEventData) => void;
-  onExecuteSuccess?: (outputFile: string) => void;
+  /** export 步骤完成时的回调，返回输出文件列表 */
+  onExportSuccess?: (outputFiles: OutputFileInfo[]) => void;
 }
 
-export const useChat = ({ onStart, initialMessages, onSessionCreated, onExecuteSuccess }: UseChatOptions) => {
+export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSuccess }: UseChatOptions) => {
   const [messages, updateMessages] = useImmer<ChatMessage[]>(initialMessages || []);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -143,9 +145,12 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExecuteS
             return;
           }
 
-          if (step === 'execute' && status === 'done' && output) {
-            const execOutput = output as ExecuteStepOutput;
-            onExecuteSuccess?.(execOutput.output_file);
+          // export 步骤完成时触发回调
+          if (step === 'export' && status === 'done' && output) {
+            const exportOutput = output as ExportStepOutput;
+            if (exportOutput.output_files?.length > 0) {
+              onExportSuccess?.(exportOutput.output_files);
+            }
           }
 
           // 验证步骤名称

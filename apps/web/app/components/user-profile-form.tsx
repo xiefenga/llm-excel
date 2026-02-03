@@ -50,7 +50,7 @@ export const UserProfileForm = ({ footer, initialValue, onSubmit }: UserProfileF
         <FieldContent>
           <input
             {...register("username")}
-            className="block w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-xs outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+            className="block w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder={initialValue.username}
           />
         </FieldContent>
@@ -62,7 +62,7 @@ export const UserProfileForm = ({ footer, initialValue, onSubmit }: UserProfileF
           <input
             type="email"
             {...register("email")}
-            className="block w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-xs outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+            className="block w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder={initialValue.email}
           />
         </FieldContent>

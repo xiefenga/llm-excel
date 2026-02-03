@@ -18,7 +18,7 @@ export type FileItemBadgeProps = Props
 const FileItemBadge = ({ onClick, file }: Props) => {
 
   return (
-    <div className="flex items-center select-none border border-emerald-500 p-1 rounded gap-0.5 hover:bg-amber-50 cursor-pointer" onClick={() => onClick?.(file.id)}>
+    <div className="flex items-center select-none border border-brand p-1 rounded gap-0.5 hover:bg-warning/10 cursor-pointer" onClick={() => onClick?.(file.id)}>
       <ExcelIcon className="w-4 h-4 shrink-0" />
       <span className="text-xs max-w-[120px] truncate">
         {file.filename}

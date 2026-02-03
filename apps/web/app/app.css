@@ -4,16 +4,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-}
-
-html,
-body {
-
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 @theme inline {
+  /* ===== 圆角系统 ===== */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -21,6 +18,8 @@ body {
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ===== 基础色（shadcn/UI） ===== */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -39,11 +38,42 @@ body {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* ===== 品牌色系统 ===== */
+  /* 主品牌色（Excel 绿色系） - 用法: bg-brand, text-brand, border-brand 等 */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-light: var(--brand-light);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-muted: var(--brand-muted);
+
+  /* 辅助品牌色（AI 蓝色系） - 用法: bg-brand-secondary, text-brand-secondary 等 */
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-secondary-foreground: var(--brand-secondary-foreground);
+
+  /* 品牌强调色 - 用法: bg-brand-accent, text-brand-accent 等 */
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-teal: var(--brand-teal);
+
+  /* ===== 功能色 ===== */
+  /* 用法: bg-success, text-warning, border-error, bg-info 等 */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* ===== 图表色 ===== */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  /* ===== 侧边栏色 ===== */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -56,6 +86,8 @@ body {
 
 :root {
   --radius: 0.625rem;
+
+  /* ===== 基础色（shadcn/UI 默认） ===== */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -74,11 +106,51 @@ body {
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+
+  /* ===== 品牌色（Excel 绿色系）===== */
+  /* 主品牌色 #059669 - emerald-600 */
+  --brand: oklch(0.596 0.145 163.225);
+  --brand-foreground: oklch(1 0 0);
+  /* 品牌浅色 #10B981 - emerald-500 */
+  --brand-light: oklch(0.696 0.17 162.48);
+  /* 品牌深色 #047857 - emerald-700 */
+  --brand-dark: oklch(0.508 0.118 165.612);
+  /* 品牌柔和色 - 用于背景 #ECFDF5 - emerald-50 */
+  --brand-muted: oklch(0.97 0.02 163);
+
+  /* ===== 品牌色（AI 蓝色系）===== */
+  /* 辅助品牌色 #3B82F6 - blue-500 */
+  --brand-secondary: oklch(0.623 0.214 259.815);
+  --brand-secondary-foreground: oklch(1 0 0);
+
+  /* ===== 品牌强调色 ===== */
+  /* 强调青色 #22D3EE - cyan-400 */
+  --brand-accent: oklch(0.789 0.154 200.723);
+  /* 过渡色 #14B8A6 - teal-500 */
+  --brand-teal: oklch(0.679 0.15 180);
+
+  /* ===== 功能色 ===== */
+  /* 成功色 - 使用品牌浅色 */
+  --success: oklch(0.696 0.17 162.48);
+  --success-foreground: oklch(1 0 0);
+  /* 警告色 #F59E0B - amber-500 */
+  --warning: oklch(0.768 0.188 84.429);
+  --warning-foreground: oklch(0.145 0 0);
+  /* 错误色 #EF4444 - red-500 */
+  --error: oklch(0.637 0.237 25.331);
+  --error-foreground: oklch(1 0 0);
+  /* 信息色 - 使用辅助品牌色 */
+  --info: oklch(0.623 0.214 259.815);
+  --info-foreground: oklch(1 0 0);
+
+  /* ===== 图表色 ===== */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
+  /* ===== 侧边栏色 ===== */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -90,6 +162,7 @@ body {
 }
 
 .dark {
+  /* ===== 基础色（shadcn/UI 默认） ===== */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -108,11 +181,47 @@ body {
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+
+  /* ===== 品牌色（深色模式 - 提高亮度）===== */
+  /* 主品牌色 #10B981 - emerald-500（比亮色模式更亮） */
+  --brand: oklch(0.696 0.17 162.48);
+  --brand-foreground: oklch(0.145 0 0);
+  /* 品牌浅色 #34D399 - emerald-400 */
+  --brand-light: oklch(0.765 0.177 163.223);
+  /* 品牌深色 #059669 - emerald-600 */
+  --brand-dark: oklch(0.596 0.145 163.225);
+  /* 品牌柔和色 - 深色背景 */
+  --brand-muted: oklch(0.269 0.05 163);
+
+  /* ===== 品牌色（AI 蓝色系）===== */
+  /* 辅助品牌色 #60A5FA - blue-400（比亮色模式更亮） */
+  --brand-secondary: oklch(0.707 0.165 254.624);
+  --brand-secondary-foreground: oklch(0.145 0 0);
+
+  /* ===== 品牌强调色 ===== */
+  /* 强调青色 #22D3EE - cyan-400 */
+  --brand-accent: oklch(0.789 0.154 200.723);
+  /* 过渡色 #2DD4BF - teal-400 */
+  --brand-teal: oklch(0.765 0.16 180);
+
+  /* ===== 功能色 ===== */
+  --success: oklch(0.765 0.177 163.223);
+  --success-foreground: oklch(0.145 0 0);
+  --warning: oklch(0.828 0.189 84.429);
+  --warning-foreground: oklch(0.145 0 0);
+  --error: oklch(0.704 0.191 22.216);
+  --error-foreground: oklch(1 0 0);
+  --info: oklch(0.707 0.165 254.624);
+  --info-foreground: oklch(0.145 0 0);
+
+  /* ===== 图表色 ===== */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+
+  /* ===== 侧边栏色 ===== */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -129,5 +238,135 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* ===== 滚动条样式 ===== */
+  /* 滚动条整体宽度 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* 滚动条轨道 */
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* 滚动条滑块 */
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.8 0 0);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.65 0 0);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* 滚动条滑块激活状态 - 使用品牌色 */
+  ::-webkit-scrollbar-thumb:active {
+    background: oklch(0.596 0.145 163.225); /* --brand */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* 滚动条角落（水平和垂直滚动条交汇处） */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* 深色模式滚动条 */
+  .dark ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0 0);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.45 0 0);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:active {
+    background: oklch(0.696 0.17 162.48); /* --brand (dark mode) */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Firefox 滚动条样式 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.8 0 0) transparent;
+  }
+
+  .dark * {
+    scrollbar-color: oklch(0.35 0 0) transparent;
+  }
+
+  /* 细滚动条变体 - 用于侧边栏等紧凑区域 */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    border-width: 1px;
+  }
+
+  /* 隐藏滚动条但保留滚动功能 */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* 仅悬停时显示滚动条 */
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.8 0 0);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0 0);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* 品牌色滚动条 - 用于强调区域 */
+  .scrollbar-brand::-webkit-scrollbar-thumb {
+    background: oklch(0.596 0.145 163.225 / 50%);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .scrollbar-brand::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.596 0.145 163.225 / 80%);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark .scrollbar-brand::-webkit-scrollbar-thumb {
+    background: oklch(0.696 0.17 162.48 / 50%);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark .scrollbar-brand::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.696 0.17 162.48 / 80%);
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 }

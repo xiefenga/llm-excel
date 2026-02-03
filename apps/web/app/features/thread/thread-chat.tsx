@@ -210,13 +210,13 @@ const ThreadChat = () => {
           <ResizablePanel defaultSize={60}>
             <div className="border-r border-gray-200 bg-white flex flex-col overflow-hidden flex-1 h-full">
               {/* 顶层 Tab 切换 */}
-              <div className="border-b border-gray-200 flex bg-linear-to-r from-white to-emerald-50/30">
+              <div className="border-b border-gray-200 flex bg-linear-to-r from-white to-brand-muted/30">
                 <button
                   onClick={() => setLeftPanelTab("input")}
                   className={cn(
                     "px-6 py-3 text-sm font-medium border-b-2 transition-all",
                     leftPanelTab === "input"
-                      ? "border-emerald-600 text-emerald-900 bg-emerald-50/50"
+                      ? "border-brand text-brand-dark bg-brand-muted/50"
                       : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50/50"
                   )}
                 >
@@ -227,7 +227,7 @@ const ThreadChat = () => {
                   className={cn(
                     "px-6 py-3 text-sm font-medium border-b-2 transition-all",
                     leftPanelTab === "output"
-                      ? "border-emerald-600 text-emerald-900 bg-emerald-50/50"
+                      ? "border-brand text-brand-dark bg-brand-muted/50"
                       : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50/50",
                     !outputFile && "opacity-50 cursor-not-allowed"
                   )}
@@ -249,7 +249,7 @@ const ThreadChat = () => {
                           className={cn(
                             "flex items-center border-b-2 transition-colors",
                             selectedFileIndex === idx
-                              ? "border-emerald-600 bg-emerald-50/30"
+                              ? "border-brand bg-brand-muted/30"
                               : "border-transparent"
                           )}
                         >
@@ -258,7 +258,7 @@ const ThreadChat = () => {
                             className={cn(
                               "px-4 py-3 flex items-center gap-2 whitespace-nowrap min-w-0 flex-1",
                               selectedFileIndex === idx
-                                ? "text-emerald-900"
+                                ? "text-brand-dark"
                                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50/50"
                             )}
                           >
@@ -268,10 +268,10 @@ const ThreadChat = () => {
                               <Loader2 className="w-3 h-3 shrink-0 animate-spin ml-1" />
                             )}
                             {fileItem.status === "success" && (
-                              <Check className="w-3 h-3 shrink-0 text-emerald-600 ml-1" />
+                              <Check className="w-3 h-3 shrink-0 text-brand ml-1" />
                             )}
                             {fileItem.status === "error" && (
-                              <X className="w-3 h-3 shrink-0 text-red-500 ml-1" />
+                              <X className="w-3 h-3 shrink-0 text-error ml-1" />
                             )}
                           </button>
                           {fileItem.status !== "uploading" && (
@@ -299,12 +299,12 @@ const ThreadChat = () => {
                           {currentFile.status === "uploading" && (
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-sm text-gray-700">
-                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                                <Loader2 className="w-4 h-4 animate-spin text-brand" />
                                 <span>正在上传...</span>
                               </div>
                               <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
                                 <div
-                                  className="absolute top-0 left-0 h-full bg-linear-to-r from-emerald-500 to-teal-500 transition-all duration-300 ease-out"
+                                  className="absolute top-0 left-0 h-full bg-linear-to-r from-brand to-brand-teal transition-all duration-300 ease-out"
                                   style={{ width: `${currentFile.progress}%` }}
                                 />
                               </div>
@@ -321,11 +321,11 @@ const ThreadChat = () => {
 
                           {currentFile.status === "error" && (
                             <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-sm text-red-700">
+                              <div className="flex items-center gap-2 text-sm text-error">
                                 <X className="w-4 h-4" />
                                 <span>上传失败</span>
                               </div>
-                              <div className="text-xs text-gray-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                              <div className="text-xs text-gray-600 bg-error/10 border border-error/30 rounded-lg p-3">
                                 {currentFile.error || "上传失败，请重试"}
                               </div>
                               <Button
@@ -347,7 +347,7 @@ const ThreadChat = () => {
 
               {/* 处理结果 Tab 内容 */}
               {leftPanelTab === "output" && (
-                <div className="flex-1 overflow-y-auto p-4 h-0 bg-linear-to-br from-white to-emerald-50/30">
+                <div className="flex-1 overflow-y-auto p-4 h-0 bg-linear-to-br from-white to-brand-muted/30">
                   {outputFile && (
                     <ExcelPreview
                       className="w-full h-full"
@@ -369,7 +369,7 @@ const ThreadChat = () => {
           <ResizableHandle withHandle />
           {/* right: LLM Chat */}
           <ResizablePanel defaultSize={40}>
-            <div className="h-full flex flex-col w-full bg-linear-to-br from-white via-emerald-50/20 to-teal-50/20">
+            <div className="h-full flex flex-col w-full bg-linear-to-br from-white via-brand-muted/20 to-brand-teal/10">
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 <MessageList
                   messages={messages}
@@ -378,8 +378,8 @@ const ThreadChat = () => {
                       <div className="flex-1 flex flex-col gap-4">
                         {/* Welcome Message */}
                         <div className="text-center py-8">
-                          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-linear-to-br from-emerald-100 to-teal-100 mb-4">
-                            <Sparkles className="w-8 h-8 text-emerald-600" />
+                          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-muted mb-4">
+                            <Sparkles className="w-8 h-8 text-brand" />
                           </div>
                           <h2 className="text-2xl font-bold bg-linear-to-r from-emerald-700 to-teal-700 bg-clip-text text-transparent mb-2">
                             开始你的 Excel 智能分析
@@ -394,10 +394,10 @@ const ThreadChat = () => {
                           onClick={handleUploadAreaClick}
                           onDragOver={handleDragOver}
                           onDrop={handleDrop}
-                          className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-all min-h-[280px] shadow-sm hover:shadow-md"
+                          className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-brand hover:bg-brand-muted/30 transition-all min-h-[280px] shadow-sm hover:shadow-md"
                         >
-                          <div className="w-20 h-20 rounded-full bg-linear-to-br from-emerald-100 to-teal-100 flex items-center justify-center">
-                            <Cloud className="w-10 h-10 text-emerald-600" />
+                          <div className="w-20 h-20 rounded-full bg-brand-muted flex items-center justify-center">
+                            <Cloud className="w-10 h-10 text-brand" />
                           </div>
                           <div className="text-center">
                             <p className="text-gray-700 font-medium mb-1">
@@ -412,22 +412,22 @@ const ThreadChat = () => {
                         {/* Upload Instructions */}
                         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
                           <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                              <Info className="w-5 h-5 text-emerald-600" />
+                            <div className="w-10 h-10 rounded-lg bg-brand-muted flex items-center justify-center shrink-0">
+                              <Info className="w-5 h-5 text-brand" />
                             </div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-gray-900 mb-2">使用说明</h3>
                               <ul className="text-sm text-gray-600 space-y-2">
                                 <li className="flex items-start gap-2">
-                                  <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                                  <span className="text-brand font-bold mt-0.5">✓</span>
                                   <span>支持上传多个 Excel 文件，系统会自动识别表结构</span>
                                 </li>
                                 <li className="flex items-start gap-2">
-                                  <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                                  <span className="text-brand font-bold mt-0.5">✓</span>
                                   <span>用自然语言描述需求，AI 会自动生成处理方案</span>
                                 </li>
                                 <li className="flex items-start gap-2">
-                                  <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                                  <span className="text-brand font-bold mt-0.5">✓</span>
                                   <span>支持多轮对话，可以基于前一轮结果继续处理</span>
                                 </li>
                               </ul>

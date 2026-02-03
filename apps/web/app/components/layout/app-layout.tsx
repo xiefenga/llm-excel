@@ -9,14 +9,14 @@ export function AppLayout({ children }: PropsWithChildren) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="h-screen flex flex-col bg-linear-to-br from-slate-50 via-emerald-50/30 to-teal-50/30">
+    <div className="h-screen flex flex-col bg-linear-to-br from-slate-50 via-brand-muted/30 to-brand-teal/10">
       {/* Header */}
       <AppHeader sidebarOpen={sidebarOpen} onSidebarOpenChange={setSidebarOpen} />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className="hidden lg:block lg:w-80 shrink-0">
+        {/* Sidebar - 弱化的历史任务列表 */}
+        <div className="hidden lg:block lg:w-64 shrink-0">
           <ThreadSidebar isOpen={true} />
         </div>
 

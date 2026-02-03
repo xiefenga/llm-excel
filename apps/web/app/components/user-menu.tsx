@@ -32,14 +32,14 @@ export const UserMenu = () => {
         <button
           type="button"
           aria-label="打开账户菜单"
-          className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-emerald-100/80 bg-linear-to-br from-emerald-50 via-teal-50 to-sky-50 shadow-sm transition-all duration-200 hover:border-emerald-300 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70"
+          className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-brand/20 bg-brand-muted shadow-sm transition-all duration-200 hover:border-brand/50 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
         >
           {/* 光晕效果 */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -inset-1 rounded-full bg-emerald-400/0 blur-md transition-colors duration-200 group-hover:bg-emerald-400/30"
+            className="pointer-events-none absolute -inset-1 rounded-full bg-brand/0 blur-md transition-colors duration-200 group-hover:bg-brand/30"
           />
-          <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-2 ring-emerald-100 bg-linear-to-br from-emerald-100 to-teal-100">
+          <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-2 ring-brand/20 bg-brand-muted">
             {user.avatar ? (
               <img
                 src={user.avatar}
@@ -47,7 +47,7 @@ export const UserMenu = () => {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <User className="h-4 w-4 text-emerald-700" />
+              <User className="h-4 w-4 text-brand-dark" />
             )}
           </span>
         </button>
@@ -55,10 +55,10 @@ export const UserMenu = () => {
 
       <PopoverContent
         align="end"
-        className="w-60 overflow-hidden rounded-xl border border-emerald-50 bg-white/95 p-0 shadow-lg shadow-emerald-900/5 backdrop-blur-md"
+        className="w-60 overflow-hidden rounded-xl border border-brand/10 bg-white/95 p-0 shadow-lg shadow-brand/5 backdrop-blur-md"
       >
         {/* 顶部用户信息 */}
-        <div className="flex items-center gap-3 border-b border-emerald-50 px-4 py-3">
+        <div className="flex items-center gap-3 border-b border-brand/10 px-4 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-medium text-gray-900">
@@ -69,7 +69,7 @@ export const UserMenu = () => {
               {user.accounts.email}
             </p>
           </div>
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+          <span className="rounded-full bg-brand-muted px-2 py-0.5 text-[11px] font-medium text-brand-dark">
             Beta
           </span>
         </div>
@@ -78,18 +78,18 @@ export const UserMenu = () => {
         <div className="space-y-1.5 px-1.5 py-2 text-sm text-gray-700">
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-emerald-50 cursor-pointer"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
             onClick={() => NiceModal.show(UserProfileDialog)}
           >
-            <User className="h-4 w-4 text-emerald-600" />
+            <User className="h-4 w-4 text-brand" />
             <span>个人信息</span>
           </button>
 
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-emerald-50 cursor-pointer"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
           >
-            <Settings className="h-4 w-4 text-emerald-600" />
+            <Settings className="h-4 w-4 text-brand" />
             <span>设置</span>
           </button>
 
@@ -97,9 +97,9 @@ export const UserMenu = () => {
 
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-emerald-50"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted"
           >
-            <MessageCircle className="h-4 w-4 text-emerald-600" />
+            <MessageCircle className="h-4 w-4 text-brand" />
             <span>反馈</span>
           </button>
 
@@ -147,7 +147,7 @@ export const UserMenu = () => {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center justify-between gap-2 p-2.5 rounded  text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+            className="flex w-full items-center justify-between gap-2 p-2.5 rounded text-sm text-error hover:bg-error/10 cursor-pointer"
           >
             <span className="inline-flex items-center gap-2">
               <LogOut className="h-4 w-4" />

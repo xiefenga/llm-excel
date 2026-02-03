@@ -42,8 +42,8 @@ export function AuthLayout({ children }: PropsWithChildren) {
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8 relative">
         {/* Background Decorative Elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-100/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-brand-muted/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-brand-teal/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
         <div className="w-full max-w-md relative z-10">
           {children}

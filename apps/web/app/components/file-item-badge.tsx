@@ -27,7 +27,7 @@ export type FileItemBadgeProps = Props
 const FileItemBadge = ({ onClick, fileItem, onRemove }: Props) => {
 
   return (
-    <div className="flex items-center select-none border border-emerald-500 p-1 rounded gap-0.5 group relative" onClick={() => fileItem.fileId && onClick?.(fileItem.fileId)}>
+    <div className="flex items-center select-none border border-brand p-1 rounded gap-0.5 group relative" onClick={() => fileItem.fileId && onClick?.(fileItem.fileId)}>
       <ExcelIcon className="w-4 h-4 shrink-0" />
       <span className="text-xs max-w-[120px] truncate cursor-pointer">
         {fileItem.file.name}
@@ -40,7 +40,7 @@ const FileItemBadge = ({ onClick, fileItem, onRemove }: Props) => {
           ))
           .with("error", () => (
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-red-500 max-w-[60px] truncate" title={fileItem.error}>
+              <span className="text-[10px] text-error max-w-[60px] truncate" title={fileItem.error}>
                 {fileItem.error || "失败"}
               </span>
               <button
@@ -48,10 +48,10 @@ const FileItemBadge = ({ onClick, fileItem, onRemove }: Props) => {
                   e.stopPropagation();
                   fileItem.fileId && onRemove?.(fileItem.fileId)
                 }}
-                className="w-4 h-4 flex items-center justify-center rounded hover:bg-red-100 transition-colors"
+                className="w-4 h-4 flex items-center justify-center rounded hover:bg-error/10 transition-colors"
                 title="删除"
               >
-                <X className="w-3 h-3 text-red-500" />
+                <X className="w-3 h-3 text-error" />
               </button>
             </div>
           ))
@@ -61,10 +61,10 @@ const FileItemBadge = ({ onClick, fileItem, onRemove }: Props) => {
                 e.stopPropagation();
                 fileItem.fileId && onRemove?.(fileItem.fileId)
               }}
-              className="w-4 h-4 flex items-center justify-center rounded hover:bg-red-100 transition-colors cursor-pointer"
+              className="w-4 h-4 flex items-center justify-center rounded hover:bg-error/10 transition-colors cursor-pointer"
               title="删除"
             >
-              <X className="w-3 h-3 text-gray-500 hover:text-red-500" />
+              <X className="w-3 h-3 text-gray-500 hover:text-error" />
             </button>
           )
           .exhaustive()}

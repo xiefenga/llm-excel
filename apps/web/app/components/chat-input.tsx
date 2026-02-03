@@ -110,7 +110,7 @@ const ChatInput = ({ text, onTextChange, onSubmit, onPasteFiles, placeholder, cl
           </div>
         </DialogContent>
       </Dialog>
-      <div className="bg-white border-2 border-emerald-500 rounded-xl py-2 shadow-sm">
+      <div className="bg-white border-2 border-brand rounded-xl py-2 shadow-sm">
         <div className="flex items-start pr-2">
           <Textarea
             rows={3}
@@ -128,7 +128,7 @@ const ChatInput = ({ text, onTextChange, onSubmit, onPasteFiles, placeholder, cl
               onClick={() => onSubmit()}
               size={"icon"}
               disabled={isSubmitDisabled || pasteFileProcessing}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 rounded-full p-3 shrink-0 cursor-pointer"
+              className="bg-brand hover:bg-brand-dark disabled:bg-gray-300 rounded-full p-3 shrink-0 cursor-pointer"
             >
               {loading || pasteFileProcessing ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

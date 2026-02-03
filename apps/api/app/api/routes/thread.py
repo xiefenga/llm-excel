@@ -168,6 +168,51 @@ async def get_thread_detail(thread_id: str, current_user: User = Depends(get_cur
         )
 
 
+class ThreadUpdateRequest(BaseModel):
+    """线程更新请求"""
+    title: Optional[str] = Field(None, description="线程标题")
+
+
+@router.patch("/{thread_id}", response_model=ApiResponse[None], summary="更新线程", description="更新指定线程的信息")
+async def update_thread(thread_id: str, request: ThreadUpdateRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """更新线程（如重命名）"""
+    try:
+        # 转换 thread_id 为 UUID
+        try:
+            thread_id_uuid = UUID(thread_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="无效的 thread_id 格式")
+
+        # 查询线程
+        stmt = select(Thread).where(Thread.id == thread_id_uuid).where(Thread.user_id == current_user.id)
+        result = await db.execute(stmt)
+        thread = result.scalar_one_or_none()
+
+        if not thread:
+            raise HTTPException(status_code=404, detail="线程不存在或无权访问")
+
+        # 更新字段
+        if request.title is not None:
+            thread.title = request.title
+
+        await db.commit()
+
+        return ApiResponse(
+            code=0,
+            data=None,
+            msg="更新成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        return ApiResponse(
+            code=500,
+            data=None,
+            msg=f"更新失败: {str(e)}"
+        )
+
+
 @router.delete("/{thread_id}", response_model=ApiResponse[None], summary="删除线程", description="删除指定的线程")
 async def delete_thread(thread_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """删除线程"""

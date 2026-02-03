@@ -277,13 +277,27 @@ async def stream_excel_processing(
         step_name = event.stage.value
         stage_id = event.stage_id
 
+        # execute 阶段：如果 output 中有 errors，转换为 error 事件
+        event_type = event.event_type
+        error_msg = getattr(event, "error", None)
+
+        if (
+            step_name == "execute"
+            and event_type == EventType.STAGE_DONE
+        ):
+            output = event.output or {}
+            errors = output.get("errors", [])
+            if errors:
+                event_type = EventType.STAGE_ERROR
+                error_msg = "; ".join(errors) if isinstance(errors, list) else str(errors)
+
         # 构建上下文并调用回调
         ctx = StageContext(
             step=step_name,
             stage_id=stage_id,
-            event_type=event.event_type,
+            event_type=event_type,
             output=getattr(event, "output", None),
-            error=getattr(event, "error", None),
+            error=error_msg,
             delta=getattr(event, "delta", None),
         )
 
@@ -291,21 +305,21 @@ async def stream_excel_processing(
             await on_event(ctx)
 
         # 生成 SSE 事件
-        if event.event_type == EventType.STAGE_START:
+        if event_type == EventType.STAGE_START:
             yield sse_step_running(step_name, stage_id)
 
-        elif event.event_type == EventType.STAGE_STREAM:
+        elif event_type == EventType.STAGE_STREAM:
             yield sse_step_streaming(step_name, event.delta, stage_id)
 
-        elif event.event_type == EventType.STAGE_DONE:
+        elif event_type == EventType.STAGE_DONE:
             yield sse_step_done(step_name, event.output, stage_id)
 
-        elif event.event_type == EventType.STAGE_ERROR:
-            yield sse_step_error(step_name, event.error, stage_id)
+        elif event_type == EventType.STAGE_ERROR:
+            yield sse_step_error(step_name, error_msg, stage_id)
             has_error = True
             # 错误后发送 complete 并终止
             yield sse_step_done(
-                "complete", {"success": False, "errors": [event.error]}
+                "complete", {"success": False, "errors": [error_msg]}
             )
             return
 

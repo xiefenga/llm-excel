@@ -293,7 +293,7 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 | ISERROR | 值 | 判断错误 |
 | IFERROR | 表达式, 错误时返回值 | 错误处理 |
 | COUNTIFS | 范围1, 条件1, 范围2, 条件2, ... | 多条件计数 |
-| VLOOKUP | 查找值, 表引用, 键列名, 值列名 | 跨表查找 |
+| VLOOKUP | 查找值, 表引用(两段式), 键列名, 值列名 | 跨表查找（**必须4个参数**） |
 | ROUND | 数值, 小数位数 | 四舍五入 |
 | ABS | 数值 | 绝对值 |
 | VALUE | 文本 | 文本转数值 |
@@ -317,6 +317,39 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 {"func": "VALUE", "args": [{"col": "price"}]}
 {"func": "SUBSTITUTE", "args": [{"col": "wage"}, {"value": "€"}, {"value": ""}]}
 ```
+
+**⚠️ VLOOKUP 特别说明（必须 4 个参数）**：
+
+VLOOKUP 用于跨表查找，格式固定为：
+```json
+{
+  "func": "VLOOKUP",
+  "args": [
+    {"col": "查找列"},              // 参数1: 当前行用于查找的列
+    {"value": "file_id.sheet"},    // 参数2: 表引用（两段式：file_id.sheet_name）
+    {"value": "键列名"},            // 参数3: 目标表中用于匹配的列名
+    {"value": "返回列名"}           // 参数4: 目标表中要返回的列名
+  ]
+}
+```
+
+**示例：从 drivers 表查找 driverRef**
+```json
+{
+  "func": "VLOOKUP",
+  "args": [
+    {"col": "driverId"},           // 当前行的 driverId
+    {"value": "drivers.drivers"},  // 表引用：file_id.sheet_name（两段式！）
+    {"value": "driverId"},         // 键列名：drivers 表中匹配的列
+    {"value": "driverRef"}         // 值列名：drivers 表中要返回的列
+  ]
+}
+```
+
+**❌ 常见错误**：
+- 使用 `{"ref": "..."}` 三段式 → 应使用 `{"value": "file_id.sheet"}` 两段式
+- 只传 3 个参数 → 必须传 4 个参数
+- 把列引用放在参数2 → 参数2 是表引用，不是列引用
 
 ### 6. 二元运算 - 使用 "op", "left", "right"
 
@@ -556,6 +589,69 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 - `{"ref": "file-001.卖断发生额明细.票据(包)号"}` - 卖断表的票据(包)号列（三段式引用）
 - `{"col": "票据(包)号"}` - 当前行的票据(包)号值
 - COUNTIFS 检查卖断表中是否存在匹配的行
+
+### 示例3.1：跨表查找（VLOOKUP）
+
+假设 schemas 如下：
+```json
+{
+  "drivers": {
+    "drivers": {"A": "driverId", "B": "driverRef", "C": "nationality", "D": "forename", "E": "surname"}
+  },
+  "results": {
+    "results": {"A": "resultId", "B": "raceId", "C": "driverId", "D": "points"}
+  }
+}
+```
+
+需求：在 results 表中通过 driverId 从 drivers 表匹配对应的 driverRef 和 nationality
+
+```json
+{
+  "operations": [
+    {
+      "type": "add_column",
+      "description": "通过 driverId 匹配 drivers 表，获取对应的 driverRef",
+      "file_id": "results",
+      "table": "results",
+      "name": "driverRef",
+      "formula": {
+        "func": "VLOOKUP",
+        "args": [
+          {"col": "driverId"},
+          {"value": "drivers.drivers"},
+          {"value": "driverId"},
+          {"value": "driverRef"}
+        ]
+      }
+    },
+    {
+      "type": "add_column",
+      "description": "通过 driverId 匹配 drivers 表，获取对应的 nationality",
+      "file_id": "results",
+      "table": "results",
+      "name": "nationality",
+      "formula": {
+        "func": "VLOOKUP",
+        "args": [
+          {"col": "driverId"},
+          {"value": "drivers.drivers"},
+          {"value": "driverId"},
+          {"value": "nationality"}
+        ]
+      }
+    }
+  ]
+}
+```
+
+**⚠️ VLOOKUP 参数说明（必须 4 个）**：
+- 参数1 `{"col": "driverId"}`: 当前行的查找值
+- 参数2 `{"value": "drivers.drivers"}`: **表引用（两段式：file_id.sheet_name）**，不是三段式！
+- 参数3 `{"value": "driverId"}`: 目标表中用于匹配的键列名
+- 参数4 `{"value": "driverRef"}`: 目标表中要返回的值列名
+
+**❌ 错误写法**：`{"ref": "drivers.drivers.driverId"}` - 这是三段式列引用，用于 COUNTIFS，不适用于 VLOOKUP
 
 ### 示例4：空值填充（使用 update_column）
 

@@ -23,7 +23,7 @@ export const UserAvatarField = ({ value, onChange, label = "头像" }: UserAvata
         <div className="flex items-center gap-4">
           <button
             type="button"
-            className="group relative w-10 h-10 rounded-full ring-2 ring-emerald-100 bg-linear-to-br from-emerald-100 to-teal-100 overflow-hidden shadow-sm hover:ring-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70"
+            className="group relative w-10 h-10 rounded-full ring-2 ring-brand/20 bg-brand-muted overflow-hidden shadow-sm hover:ring-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
             onClick={() => fileInputRef.current?.click()}
           >
             {value ? (
@@ -34,7 +34,7 @@ export const UserAvatarField = ({ value, onChange, label = "头像" }: UserAvata
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
-                <User className="h-6 w-6 text-emerald-700" />
+                <User className="h-6 w-6 text-brand-dark" />
               </div>
             )}
           </button>
@@ -79,7 +79,7 @@ export const UserAvatarField = ({ value, onChange, label = "头像" }: UserAvata
           <p className="mt-1 text-xs text-gray-400">正在上传头像...</p>
         )}
         {error && (
-          <p className="mt-1 text-xs text-red-500">{error}</p>
+          <p className="mt-1 text-xs text-error">{error}</p>
         )}
       </FieldContent>
     </Field>

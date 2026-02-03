@@ -1,7 +1,9 @@
-import { Menu, X } from "lucide-react";
+import { useNavigate, useParams } from "react-router";
+import { Menu, X, Plus } from "lucide-react";
 
 import { Logo } from "~/components/logo";
 import { UserMenu } from "~/components/user-menu";
+import { Button } from "~/components/ui/button";
 
 interface Props {
   sidebarOpen: boolean;
@@ -9,8 +11,18 @@ interface Props {
 }
 
 const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
+  const navigate = useNavigate();
+  const params = useParams();
+
+  // 判断是否在任务详情页
+  const isInTask = !!params.id;
+
+  const handleNewTask = () => {
+    navigate("/threads");
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-emerald-100/80 bg-white/80 backdrop-blur-md shadow-sm">
+    <header className="sticky top-0 z-40 w-full border-b border-brand/20 bg-white/80 backdrop-blur-md shadow-sm">
       <div className="flex h-16 items-center justify-between px-4 lg:px-6">
         {/* Left: Logo and Menu */}
         <div className="flex items-center gap-4">
@@ -33,8 +45,18 @@ const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
           </div>
         </div>
 
-        {/* Right: User Avatar & Menu */}
+        {/* Right: New Task Button & User Avatar & Menu */}
         <div className="flex items-center gap-3">
+          {isInTask && (
+            <Button
+              onClick={handleNewTask}
+              size="sm"
+              className="bg-linear-to-r from-brand to-brand-teal hover:from-brand-dark hover:to-brand text-white"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              新建任务
+            </Button>
+          )}
           <UserMenu />
         </div>
       </div>

@@ -36,13 +36,13 @@ const RightPreview = ({ panelTab, onPanelTabChange, inputFiles, outputFile }: Pr
   return (
     <div className="bg-white flex flex-col overflow-hidden flex-1 h-full">
       {/* 顶层 Tab 切换 */}
-      <div className="border-b border-gray-200 flex bg-linear-to-r from-white to-emerald-50/30">
+      <div className="border-b border-gray-200 flex bg-linear-to-r from-white to-brand-muted/30">
         <button
           onClick={() => onPanelTabChange("input")}
           className={cn(
             "px-6 py-3 text-sm font-medium border-b-2 transition-all",
             panelTab === "input"
-              ? "border-emerald-600 text-emerald-900 bg-emerald-50/50"
+              ? "border-brand text-brand-dark bg-brand-muted/50"
               : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50/50"
           )}
         >
@@ -53,7 +53,7 @@ const RightPreview = ({ panelTab, onPanelTabChange, inputFiles, outputFile }: Pr
           className={cn(
             "px-6 py-3 text-sm font-medium border-b-2 transition-all",
             panelTab === "output"
-              ? "border-emerald-600 text-emerald-900 bg-emerald-50/50"
+              ? "border-brand text-brand-dark bg-brand-muted/50"
               : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50/50",
             !outputFile && "opacity-50 cursor-not-allowed"
           )}
@@ -75,7 +75,7 @@ const RightPreview = ({ panelTab, onPanelTabChange, inputFiles, outputFile }: Pr
                   className={cn(
                     "flex items-center border-b-2 transition-colors",
                     selectedFileId === item.id
-                      ? "border-emerald-600 bg-emerald-50/30"
+                      ? "border-brand bg-brand-muted/30"
                       : "border-transparent"
                   )}
                 >
@@ -84,7 +84,7 @@ const RightPreview = ({ panelTab, onPanelTabChange, inputFiles, outputFile }: Pr
                     className={cn(
                       "px-4 py-3 flex items-center gap-2 whitespace-nowrap min-w-0 flex-1",
                       selectedFileId === item.id
-                        ? "text-emerald-900"
+                        ? "text-brand-dark"
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50/50"
                     )}
                   >
@@ -175,7 +175,7 @@ const RightPreview = ({ panelTab, onPanelTabChange, inputFiles, outputFile }: Pr
 
       {/* 处理结果 Tab 内容 */}
       {panelTab === "output" && (
-        <div className="flex-1 overflow-y-auto p-4 h-0 bg-linear-to-br from-white to-emerald-50/30">
+        <div className="flex-1 overflow-y-auto p-4 h-0 bg-linear-to-br from-white to-brand-muted/30">
           {match(outputFile)
             .with(P.string, (outputFile) => (
               <ExcelPreview className="w-full h-full" fileUrl={outputFile} />
