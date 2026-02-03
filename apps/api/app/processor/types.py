@@ -176,7 +176,9 @@ class ProcessResult:
         if self.analysis:
             parts.append(f"analysis={len(self.analysis)} chars")
         if self.operations:
-            parts.append(f"operations={len(self.operations.get('operations', []))} ops")
+            # operations 现在是列表
+            ops_count = len(self.operations) if isinstance(self.operations, list) else 0
+            parts.append(f"operations={ops_count} ops")
         if self.strategy:
             parts.append("strategy=yes")
         if self.manual_steps:

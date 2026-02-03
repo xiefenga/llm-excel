@@ -119,20 +119,22 @@ class ExecuteStage(Stage):
             manual_steps = None
 
             if operations:
+                from app.engine.output_generator import (
+                    generate_strategy,
+                    generate_manual_steps,
+                )
+
+                # 生成思路解读
                 try:
-                    from app.engine.output_generator import (
-                        generate_strategy,
-                        generate_manual_steps,
-                    )
-
-                    # 生成思路解读
                     strategy = generate_strategy(operations, tables)
-
-                    # 生成快捷复现
-                    manual_steps = generate_manual_steps(operations, tables)
-
                 except Exception as e:
-                    logger.warning(f"生成输出失败: {e}")
+                    logger.warning(f"生成思路解读失败: {e}", exc_info=True)
+
+                # 生成快捷复现（独立 try，不影响 strategy）
+                try:
+                    manual_steps = generate_manual_steps(operations, tables)
+                except Exception as e:
+                    logger.warning(f"生成快捷复现失败: {e}", exc_info=True)
 
             output = {
                 "strategy": strategy,

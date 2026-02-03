@@ -13,6 +13,7 @@ from app.engine.models import (
     CreateSheetOperation,
     TakeOperation,
 )
+from app.engine.excel_generator import ExcelFormulaGenerator
 
 
 # ==================== 常量定义 ====================
@@ -379,11 +380,14 @@ def generate_manual_steps(operations: List, tables: FileCollection) -> str:
 
     lines = ["🔧 手动操作步骤", ""]
 
+    # 创建公式生成器
+    formula_generator = ExcelFormulaGenerator(tables)
+
     # 收集高级操作的公式（用于 365 提示）
     advanced_formulas = []
 
     for i, op in enumerate(operations, 1):
-        step_lines, formula_info = _generate_manual_step(op, tables, i)
+        step_lines, formula_info = _generate_manual_step(op, tables, i, formula_generator)
         lines.extend(step_lines)
         lines.append("")
 
@@ -404,7 +408,12 @@ def generate_manual_steps(operations: List, tables: FileCollection) -> str:
     return "\n".join(lines)
 
 
-def _generate_manual_step(op, tables: FileCollection, step_num: int) -> tuple:
+def _generate_manual_step(
+    op,
+    tables: FileCollection,
+    step_num: int,
+    formula_generator: ExcelFormulaGenerator
+) -> tuple:
     """
     生成单个步骤的手动操作说明
 
@@ -454,23 +463,27 @@ def _generate_manual_step(op, tables: FileCollection, step_num: int) -> tuple:
         }
 
     elif isinstance(op, AddColumnOperation):
-        step_lines = _generate_add_column_manual_steps(op, tables)
+        step_lines = _generate_add_column_manual_steps(op, tables, formula_generator)
         lines.extend(step_lines)
 
     elif isinstance(op, UpdateColumnOperation):
-        step_lines = _generate_update_column_manual_steps(op, tables)
+        step_lines = _generate_update_column_manual_steps(op, tables, formula_generator)
         lines.extend(step_lines)
 
     elif isinstance(op, AggregateOperation):
-        step_lines = _generate_aggregate_manual_steps(op, tables)
+        step_lines = _generate_aggregate_manual_steps(op, tables, formula_generator)
         lines.extend(step_lines)
 
     elif isinstance(op, CreateSheetOperation):
         step_lines = _generate_create_sheet_manual_steps(op, tables)
         lines.extend(step_lines)
 
+    elif isinstance(op, ComputeOperation):
+        step_lines = _generate_compute_manual_steps(op, tables, formula_generator)
+        lines.extend(step_lines)
+
     else:
-        lines.append("   （请参考 Excel 公式复现部分）")
+        lines.append("   （此操作类型暂不支持手动复现）")
 
     return lines, formula_info
 
@@ -688,7 +701,11 @@ def _generate_take_manual_steps(op: TakeOperation, tables: FileCollection) -> tu
     return lines, formula
 
 
-def _generate_add_column_manual_steps(op: AddColumnOperation, tables: FileCollection) -> List[str]:
+def _generate_add_column_manual_steps(
+    op: AddColumnOperation,
+    tables: FileCollection,
+    formula_generator: ExcelFormulaGenerator
+) -> List[str]:
     """生成 add_column 操作的手动步骤"""
     try:
         excel_file = tables.get_file(op.file_id)
@@ -696,17 +713,34 @@ def _generate_add_column_manual_steps(op: AddColumnOperation, tables: FileCollec
     except Exception:
         filename = "Excel 文件"
 
+    # 生成公式
+    formula = ""
+    if isinstance(op.formula, dict):
+        formula_template = formula_generator.generate_formula(
+            op.formula, op.file_id, op.table
+        )
+        formula = f"={formula_template}".replace("{row}", "2")  # 用第 2 行作为示例
+
     lines = [
         f"   1. 打开 {filename}，切换到「{op.table}」工作表",
         f"   2. 在最后一列的右边空白列的表头单元格输入「{op.name}」",
-        f"   3. 在该列的第一个数据单元格中输入公式（见 Excel 公式复现部分）",
-        f"   4. 选中该单元格，双击右下角的填充柄（或按 Ctrl+D）向下填充到所有数据行",
     ]
+
+    if formula:
+        lines.append(f"   3. 在该列的第一个数据单元格（第 2 行）输入公式：")
+        lines.append(f"      {formula}")
+        lines.append(f"   4. 选中该单元格，双击右下角的填充柄（或按 Ctrl+D）向下填充到所有数据行")
+    else:
+        lines.append(f"   3. 根据业务逻辑在该列输入相应的公式或数据")
 
     return lines
 
 
-def _generate_update_column_manual_steps(op: UpdateColumnOperation, tables: FileCollection) -> List[str]:
+def _generate_update_column_manual_steps(
+    op: UpdateColumnOperation,
+    tables: FileCollection,
+    formula_generator: ExcelFormulaGenerator
+) -> List[str]:
     """生成 update_column 操作的手动步骤"""
     try:
         excel_file = tables.get_file(op.file_id)
@@ -714,20 +748,40 @@ def _generate_update_column_manual_steps(op: UpdateColumnOperation, tables: File
     except Exception:
         filename = "Excel 文件"
 
+    # 生成公式
+    formula = ""
+    if isinstance(op.formula, dict):
+        formula_template = formula_generator.generate_formula(
+            op.formula, op.file_id, op.table
+        )
+        formula = f"={formula_template}".replace("{row}", "2")
+
     lines = [
         f"   1. 打开 {filename}，切换到「{op.table}」工作表",
         f"   2. 在「{op.column}」列旁边插入一个临时列",
-        f"   3. 在临时列的第一个数据单元格中输入公式（见 Excel 公式复现部分）",
+    ]
+
+    if formula:
+        lines.append(f"   3. 在临时列的第一个数据单元格（第 2 行）输入公式：")
+        lines.append(f"      {formula}")
+    else:
+        lines.append(f"   3. 在临时列的第一个数据单元格输入相应公式")
+
+    lines.extend([
         f"   4. 向下填充公式到所有数据行",
         f"   5. 选中临时列的所有数据，按 Ctrl+C 复制",
         f"   6. 选中「{op.column}」列的数据区域，右键 →「选择性粘贴」→「值」",
         f"   7. 删除临时列",
-    ]
+    ])
 
     return lines
 
 
-def _generate_aggregate_manual_steps(op: AggregateOperation, tables: FileCollection) -> List[str]:
+def _generate_aggregate_manual_steps(
+    op: AggregateOperation,
+    tables: FileCollection,
+    formula_generator: ExcelFormulaGenerator
+) -> List[str]:
     """生成 aggregate 操作的手动步骤"""
     try:
         excel_file = tables.get_file(op.file_id)
@@ -737,14 +791,31 @@ def _generate_aggregate_manual_steps(op: AggregateOperation, tables: FileCollect
 
     func_name = AGGREGATE_FUNCTION_NAMES.get(op.function, op.function)
 
+    # 生成聚合公式
+    col_letter = formula_generator._find_column_letter(op.file_id, op.table, op.column)
+    col_range = f"{op.table}!{col_letter}:{col_letter}"
+
+    if op.function in ("SUMIF", "COUNTIF", "AVERAGEIF") and op.condition_column:
+        # 条件聚合
+        cond_letter = formula_generator._find_column_letter(op.file_id, op.table, op.condition_column)
+        cond_range = f"{op.table}!{cond_letter}:{cond_letter}"
+        if isinstance(op.condition, str):
+            formula = f"={op.function}({cond_range}, \"{op.condition}\", {col_range})"
+        else:
+            formula = f"={op.function}({cond_range}, {op.condition}, {col_range})"
+    else:
+        # 简单聚合
+        formula = f"={op.function}({col_range})"
+
     lines = [
         f"   1. 打开 {filename}，切换到「{op.table}」工作表",
-        f"   2. 在空白单元格输入聚合公式（见 Excel 公式复现部分）",
+        f"   2. 在空白单元格输入公式：",
+        f"      {formula}",
         f"   3. 结果即为「{op.column}」列的{func_name}",
     ]
 
     if op.as_var:
-        lines.append(f"   4. 此结果将用于后续计算，变量名为 {op.as_var}")
+        lines.append(f"   4. 此结果将用于后续计算（记录为 {op.as_var}）")
 
     return lines
 
@@ -769,3 +840,49 @@ def _generate_create_sheet_manual_steps(op: CreateSheetOperation, tables: FileCo
         ]
 
     return lines
+
+
+def _generate_compute_manual_steps(
+    op: ComputeOperation,
+    tables: FileCollection,
+    formula_generator: ExcelFormulaGenerator
+) -> List[str]:
+    """生成 compute 操作的手动步骤"""
+    # compute 通常是基于前面 aggregate 结果的计算
+    # 这里生成一个说明性的步骤
+
+    lines = [
+        f"   1. 此步骤基于前面聚合结果进行计算",
+    ]
+
+    if op.expression:
+        # 尝试生成公式（可能包含变量引用）
+        formula_str = _describe_compute_formula(op.expression)
+        lines.append(f"   2. 计算公式：{formula_str}")
+
+    lines.append(f"   3. 结果记录为变量 {op.as_var}，供后续步骤使用")
+
+    return lines
+
+
+def _describe_compute_formula(formula: Dict) -> str:
+    """描述 compute 公式（简化版，用于手动步骤说明）"""
+    if not isinstance(formula, dict):
+        return str(formula)
+
+    if "value" in formula:
+        return str(formula["value"])
+
+    if "var" in formula:
+        return f"${{{formula['var']}}}"
+
+    if "op" in formula:
+        left = _describe_compute_formula(formula.get("left", {}))
+        right = _describe_compute_formula(formula.get("right", {}))
+        return f"({left} {formula['op']} {right})"
+
+    if "func" in formula:
+        args = [_describe_compute_formula(arg) for arg in formula.get("args", [])]
+        return f"{formula['func']}({', '.join(args)})"
+
+    return "..."

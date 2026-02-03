@@ -224,7 +224,12 @@ class ExcelProcessor:
 
         elif stage == ProcessStage.GENERATE:
             # GenerateValidateStage 复合阶段的输出
-            result.operations = output.get("operations")
+            # operations_dict 结构是 {"operations": [...]}, 提取操作列表存储
+            operations_dict = output.get("operations", {})
+            if isinstance(operations_dict, dict):
+                result.operations = operations_dict.get("operations", [])
+            else:
+                result.operations = operations_dict or []
             # 验证错误会传递给 execute 阶段处理
 
         elif stage == ProcessStage.EXECUTE:

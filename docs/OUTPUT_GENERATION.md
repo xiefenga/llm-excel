@@ -212,12 +212,6 @@
 
 ---
 
-### 3. Excel 公式（已有，优化）
-
-保持现有的 `format_formula_output()` 实现，作为技术参考。
-
----
-
 ## 实现设计
 
 ### 数据结构变更
@@ -229,9 +223,9 @@
 class ProcessResult:
     # 各阶段输出
     analysis: Optional[str] = None
-    operations: Optional[Dict] = None
-    strategy: Optional[str] = None       # 思路解读
-    manual_steps: Optional[str] = None   # 快捷复现
+    operations: Optional[List] = None     # 操作列表（JSON 序列化后的操作对象）
+    strategy: Optional[str] = None        # 思路解读
+    manual_steps: Optional[str] = None    # 快捷复现
 
     # 执行结果
     variables: Dict[str, Any] = field(default_factory=dict)
@@ -365,14 +359,33 @@ class ExecuteStage:
 
 ```
 apps/api/app/engine/
-├── output_generator.py    # 新增：输出生成器
-├── excel_generator.py     # 已有：Excel 公式生成
+├── output_generator.py    # 输出生成器（思路解读 + 快捷复现）
+├── excel_generator.py     # Excel 公式生成器（供 output_generator 使用）
 ├── ...
 ```
 
 ---
 
+## 注意事项
+
+### 异常处理
+
+`generate_strategy()` 和 `generate_manual_steps()` 在 `execute.py` 中分别用独立的 try 块调用，确保一个失败不影响另一个。
+
+### 操作对象属性
+
+- `ComputeOperation` 使用 `expression` 字段（不是 `formula`）
+- `AggregateOperation` 使用 `as_var` 字段存储变量名
+
+---
+
 ## 更新日志
+
+- **2026-02-03**：实现完善
+  - 移除 formulas 字段（Excel 公式复现），合并到 manual_steps 中
+  - 修复 ComputeOperation 属性名（expression，非 formula）
+  - 分离 strategy 和 manual_steps 的异常处理
+  - operations 存储为列表格式
 
 - **2026-02-02**：初始设计
   - 新增思路解读（strategy）输出

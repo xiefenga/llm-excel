@@ -191,7 +191,7 @@ class GenerateValidateStage(Stage):
 
             yield self._create_event(
                 ProcessStage.GENERATE, EventType.STAGE_DONE,
-                stage_id=stage_id, output={"operations": operations_dict}
+                stage_id=stage_id, output=operations_dict  # operations_dict 本身就是 {"operations": [...]}
             )
 
             return operations_json, operations_dict
