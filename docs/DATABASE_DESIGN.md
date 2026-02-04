@@ -530,7 +530,7 @@ CREATE TABLE threads (
 
 ### 10. ThreadTurn（线程消息表）
 
-存储线程中的每条用户消息及其处理信息。每条消息包含一次完整的处理流程（用户输入 → LLM 分析 → 生成操作 → 执行结果）。
+存储线程中的每条用户消息及其处理信息。每条消息包含一次完整的处理流程（用户输入 → 生成操作 → 执行结果）。
 
 **说明**：虽然表名是 `thread_turns`，但在业务逻辑上更接近"消息"（message）的概念。每条记录代表用户发送的一条消息及其完整的处理结果。
 
@@ -544,8 +544,7 @@ class ThreadTurn(Base):
     turn_number: int             # 消息序号（1, 2, 3...，在同一线程内递增，类似消息顺序）
     user_query: str              # 用户消息内容（自然语言需求）
     status: str                 # 处理状态: pending, processing, completed, failed
-    analysis: str (nullable)     # LLM 第一步分析结果（文本）
-    operations_json: JSONB (nullable)  # LLM 第二步生成的 operations JSON
+    operations_json: JSONB (nullable)  # LLM 生成的 operations JSON
     error_message: str (nullable) # 错误信息
 
     # 时间戳
@@ -572,7 +571,6 @@ CREATE TABLE thread_turns (
     turn_number INTEGER NOT NULL,
     user_query TEXT NOT NULL,
     status VARCHAR NOT NULL,
-    analysis TEXT,
     operations_json JSONB,
     error_message TEXT,
     created_at TIMESTAMP NOT NULL,
@@ -608,7 +606,7 @@ CREATE TABLE thread_turns (
 
 - 每条 `ThreadTurn` 记录代表用户发送的一条消息
 - `turn_number` 表示消息在线程中的顺序（第1条、第2条...）
-- 每条消息都会经过完整的处理流程：分析 → 生成 → 执行
+- 每条消息都会经过完整的处理流程：生成 → 执行
 - **重要**：文件关联到每条消息，而不是线程，这样每轮对话可以使用不同的文件组合，更灵活
 
 ### 11. TurnResult（轮次结果表）
@@ -1146,7 +1144,6 @@ SELECT
     tt.turn_number,
     tt.user_query,
     tt.status as message_status,
-    tt.analysis,
     tt.created_at as message_created_at
 FROM threads t
 LEFT JOIN thread_turns tt ON t.id = tt.thread_id
@@ -1247,7 +1244,7 @@ WHERE id = :turn_id;
 
 -- 5. 处理完成后更新
 UPDATE thread_turns
-SET status = 'completed', completed_at = NOW(), analysis = :analysis, operations_json = :operations_json
+SET status = 'completed', completed_at = NOW(), operations_json = :operations_json
 WHERE id = :turn_id;
 
 -- 6. 保存结果
@@ -1284,7 +1281,7 @@ WHERE u.id = :user_id;
    - 线程可以归档或删除（软删除）
 
 2. **消息（ThreadTurn/ThreadMessage）**：代表线程中的一条用户消息及其处理结果
-   - 每条消息包含：用户输入 → LLM 分析 → 生成操作 → 执行结果
+- 每条消息包含：用户输入 → 生成操作 → 执行结果
    - 消息按 `turn_number` 排序（1, 2, 3...）
    - 后续消息可以基于前面消息的结果进行进一步处理
    - 概念上类似于聊天系统中的消息（message）
@@ -1317,7 +1314,7 @@ WHERE u.id = :user_id;
 ```
 用户发送消息 query
     ↓
-加载文件 → LLM 分析 → 生成操作 → 执行 → 返回结果
+加载文件 → 生成操作 → 执行 → 返回结果
     ↓
 保存消息记录和结果
 ```
@@ -1354,12 +1351,6 @@ data: {"action": "load", "status": "start"}
 
 event: message
 data: {"action": "load", "status": "done", "data": {...}}
-
-event: message
-data: {"action": "analysis", "status": "start"}
-
-event: message
-data: {"action": "analysis", "status": "done", "data": {...}}
 
 event: message
 data: {"action": "generate", "status": "start"}
@@ -1452,7 +1443,7 @@ data: {"action": "execute", "status": "done", "data": {...}}
    class TaskLog(Base):
        id: UUID
        task_id: UUID
-       action: str  # load, analysis, generate, execute
+    action: str  # load, generate, execute
        status: str  # start, done, error
        message: str
        created_at: datetime

@@ -15,6 +15,8 @@ from app.engine.models import (
     GroupByOperation,
     CreateSheetOperation,
     TakeOperation,
+    SelectColumnsOperation,
+    DropColumnsOperation,
     ExecutionResult,
     OperationResult,
     ExcelError,
@@ -458,8 +460,8 @@ class Executor:
                         # 立即将更新后的列应用到表中，以便后续操作可以引用
                         self._apply_updated_column(op.file_id, op.table, op.column, op_result.value)
 
-                # 处理新创建的 Sheet（filter, sort, group_by, create_sheet, take）
-                if isinstance(op, (FilterOperation, SortOperation, GroupByOperation, CreateSheetOperation, TakeOperation)):
+                # 处理新创建的 Sheet（filter, sort, group_by, create_sheet, take, select/drop）
+                if isinstance(op, (FilterOperation, SortOperation, GroupByOperation, CreateSheetOperation, TakeOperation, SelectColumnsOperation, DropColumnsOperation)):
                     if has_value and isinstance(op_result.value, dict):
                         sheet_data = op_result.value
                         if "sheet_name" in sheet_data and "data" in sheet_data:
@@ -529,6 +531,10 @@ class Executor:
             return self._execute_create_sheet(op)
         elif isinstance(op, TakeOperation):
             return self._execute_take(op)
+        elif isinstance(op, SelectColumnsOperation):
+            return self._execute_select_columns(op)
+        elif isinstance(op, DropColumnsOperation):
+            return self._execute_drop_columns(op)
         else:
             return OperationResult(
                 operation=op,
@@ -762,7 +768,18 @@ class Executor:
             for cond in op.conditions:
                 col = cond["column"]
                 operator = cond["op"]
-                value = cond["value"]
+                raw_value = cond["value"]
+                
+                # ✅ 对 value 进行表达式求值（支持变量引用）
+                if isinstance(raw_value, dict):
+                    evaluator = FormulaEvaluator(
+                        tables=self.tables,
+                        functions=ROW_FUNC_MAP,
+                        variables=self.variables  # 传入变量上下文
+                    )
+                    value = evaluator.evaluate(raw_value)
+                else:
+                    value = raw_value
 
                 if col not in df.columns:
                     return OperationResult(
@@ -1102,6 +1119,89 @@ class Executor:
                 result_df = df.tail(abs(op.rows)).reset_index(drop=True)
 
             # 确定输出
+            output_type = op.output.get("type", "in_place") if op.output else "in_place"
+            if output_type == "new_sheet":
+                output_name = op.output["name"]
+            else:
+                output_name = op.table
+
+            return OperationResult(
+                operation=op,
+                value={
+                    "file_id": op.file_id,
+                    "sheet_name": output_name,
+                    "data": result_df,
+                    "row_count": len(result_df)
+                }
+            )
+
+        except Exception as e:
+            return OperationResult(operation=op, error=str(e))
+
+    def _execute_select_columns(self, op: SelectColumnsOperation) -> OperationResult:
+        """
+        执行选择列操作
+
+        使用 pandas 投影列，对应 Excel 365 的 CHOOSECOLS 函数
+        """
+        try:
+            table = self.tables.get_table(op.file_id, op.table)
+            df = table.get_data()
+
+            missing = [col for col in op.columns if col not in df.columns]
+            if missing:
+                return OperationResult(
+                    operation=op,
+                    error=f"列不存在: {', '.join(missing)}"
+                )
+
+            result_df = df.loc[:, op.columns].copy().reset_index(drop=True)
+
+            output_type = op.output.get("type", "in_place") if op.output else "in_place"
+            if output_type == "new_sheet":
+                output_name = op.output["name"]
+            else:
+                output_name = op.table
+
+            return OperationResult(
+                operation=op,
+                value={
+                    "file_id": op.file_id,
+                    "sheet_name": output_name,
+                    "data": result_df,
+                    "row_count": len(result_df)
+                }
+            )
+
+        except Exception as e:
+            return OperationResult(operation=op, error=str(e))
+
+    def _execute_drop_columns(self, op: DropColumnsOperation) -> OperationResult:
+        """
+        执行删除列操作
+
+        使用 pandas 删除列，对应 Excel 365 的 CHOOSECOLS 函数
+        """
+        try:
+            table = self.tables.get_table(op.file_id, op.table)
+            df = table.get_data()
+
+            missing = [col for col in op.columns if col not in df.columns]
+            if missing:
+                return OperationResult(
+                    operation=op,
+                    error=f"列不存在: {', '.join(missing)}"
+                )
+
+            keep_columns = [col for col in df.columns if col not in op.columns]
+            if not keep_columns:
+                return OperationResult(
+                    operation=op,
+                    error="删除列后表为空，请调整 columns"
+                )
+
+            result_df = df.loc[:, keep_columns].copy().reset_index(drop=True)
+
             output_type = op.output.get("type", "in_place") if op.output else "in_place"
             if output_type == "new_sheet":
                 output_name = op.output["name"]

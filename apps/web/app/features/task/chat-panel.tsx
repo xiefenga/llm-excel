@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { useState, useMemo } from 'react'
-import { RefreshCw, Sparkles, ChevronDown, ChevronUp, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock } from 'lucide-react'
+import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock } from 'lucide-react'
 
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
@@ -9,6 +9,7 @@ import TaskInput from './task-input'
 import UserMessageCard from './user-message-card'
 import { StepItem } from '~/components/step-item'
 import ExcelPreview from '~/components/excel-preview'
+import InsightCard from '~/components/insight-card'
 import ExcelIcon from '~/assets/iconify/vscode-icons/file-type-excel.svg?react'
 
 import { cn } from '~/lib/utils'
@@ -445,64 +446,5 @@ const ProcessingSummary = ({
     )}
   </div>
 )
-
-/** 洞察卡片组件 */
-const InsightCard = ({
-  icon,
-  title,
-  content,
-  variant = 'info',
-  defaultExpanded = false,
-}: {
-  icon: React.ReactNode
-  title: string
-  content: string
-  variant?: 'info' | 'warning'
-  defaultExpanded?: boolean
-}) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-
-  const colors = {
-    info: {
-      bg: 'bg-info/5',
-      border: 'border-info/20',
-      header: 'bg-info/10 hover:bg-info/15',
-      icon: 'text-info',
-      text: 'text-info',
-    },
-    warning: {
-      bg: 'bg-warning/5',
-      border: 'border-warning/20',
-      header: 'bg-warning/10 hover:bg-warning/15',
-      icon: 'text-warning',
-      text: 'text-warning',
-    },
-  }
-  const c = colors[variant]
-
-  return (
-    <div className={cn("rounded-lg border overflow-hidden", c.border, c.bg)}>
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={cn("w-full flex items-center justify-between px-3 py-2.5 transition-colors", c.header)}
-      >
-        <div className="flex items-center gap-2">
-          <span className={c.icon}>{icon}</span>
-          <span className={cn("text-sm font-medium", c.text)}>{title}</span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className={cn("w-4 h-4", c.icon)} />
-        ) : (
-          <ChevronDown className={cn("w-4 h-4", c.icon)} />
-        )}
-      </button>
-      {isExpanded && (
-        <pre className="text-sm p-3 whitespace-pre-wrap font-sans text-gray-700 bg-white/50">
-          {content}
-        </pre>
-      )}
-    </div>
-  )
-}
 
 export default ChatPanel

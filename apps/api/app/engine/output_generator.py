@@ -12,6 +12,8 @@ from app.engine.models import (
     GroupByOperation,
     CreateSheetOperation,
     TakeOperation,
+    SelectColumnsOperation,
+    DropColumnsOperation,
 )
 from app.engine.excel_generator import ExcelFormulaGenerator
 
@@ -29,10 +31,12 @@ OPERATION_TYPE_NAMES = {
     "group_by": "分组统计",
     "take": "取前/后 N 行",
     "create_sheet": "创建工作表",
+    "select_columns": "选择列",
+    "drop_columns": "删除列",
 }
 
 # 高级操作（需要区分 365 / 非 365）
-ADVANCED_OPERATIONS = {"filter", "sort", "group_by", "take"}
+ADVANCED_OPERATIONS = {"filter", "sort", "group_by", "take", "select_columns", "drop_columns"}
 
 # 聚合函数中文名
 AGGREGATE_FUNCTION_NAMES = {
@@ -167,6 +171,14 @@ def _generate_fallback_description(op) -> str:
         else:
             return f"从 {op.table} 表取后 {abs(op.rows)} 行"
 
+    if isinstance(op, SelectColumnsOperation):
+        cols = ", ".join(op.columns)
+        return f"从 {op.table} 表中选择列：{cols}"
+
+    if isinstance(op, DropColumnsOperation):
+        cols = ", ".join(op.columns)
+        return f"从 {op.table} 表中删除列：{cols}"
+
     if isinstance(op, CreateSheetOperation):
         return f"创建新工作表「{op.name}」"
 
@@ -191,6 +203,10 @@ def _get_operation_type(op) -> str:
         return "group_by"
     if isinstance(op, TakeOperation):
         return "take"
+    if isinstance(op, SelectColumnsOperation):
+        return "select_columns"
+    if isinstance(op, DropColumnsOperation):
+        return "drop_columns"
     if isinstance(op, CreateSheetOperation):
         return "create_sheet"
     return "unknown"
@@ -258,6 +274,12 @@ def _get_operation_details(op) -> List[str]:
             aggs.append(f"{agg['column']} 的{func}")
         details.append(f"计算：{', '.join(aggs)}")
 
+    elif isinstance(op, SelectColumnsOperation):
+        details.append(f"保留列：{', '.join(op.columns)}")
+
+    elif isinstance(op, DropColumnsOperation):
+        details.append(f"删除列：{', '.join(op.columns)}")
+
     elif isinstance(op, AggregateOperation):
         # 条件聚合的条件
         if op.condition_column and op.condition is not None:
@@ -301,6 +323,12 @@ def _get_method_info(op) -> str:
     if isinstance(op, TakeOperation):
         return "TAKE 函数"
 
+    if isinstance(op, SelectColumnsOperation):
+        return "CHOOSECOLS 函数"
+
+    if isinstance(op, DropColumnsOperation):
+        return "CHOOSECOLS 函数"
+
     if isinstance(op, CreateSheetOperation):
         source_type = (op.source or {}).get("type", "empty")
         if source_type == "copy":
@@ -343,6 +371,10 @@ def _generate_final_result_summary(operations: List, tables: FileCollection) -> 
                 new_sheets.append(output.get("name", ""))
         elif isinstance(op, CreateSheetOperation):
             new_sheets.append(op.name)
+        elif isinstance(op, (SelectColumnsOperation, DropColumnsOperation, SortOperation, TakeOperation)):
+            output = getattr(op, 'output', None) or {}
+            if isinstance(output, dict) and output.get("type") == "new_sheet":
+                new_sheets.append(output.get("name", ""))
 
     # 检查是否有新增的列
     new_columns = []
@@ -455,6 +487,24 @@ def _generate_manual_step(
 
     elif isinstance(op, TakeOperation):
         step_lines, formula = _generate_take_manual_steps(op, tables)
+        lines.extend(step_lines)
+        formula_info = {
+            "step": step_num,
+            "description": description,
+            "formula": formula
+        }
+
+    elif isinstance(op, SelectColumnsOperation):
+        step_lines, formula = _generate_select_columns_manual_steps(op, tables)
+        lines.extend(step_lines)
+        formula_info = {
+            "step": step_num,
+            "description": description,
+            "formula": formula
+        }
+
+    elif isinstance(op, DropColumnsOperation):
+        step_lines, formula = _generate_drop_columns_manual_steps(op, tables)
         lines.extend(step_lines)
         formula_info = {
             "step": step_num,
@@ -699,6 +749,105 @@ def _generate_take_manual_steps(op: TakeOperation, tables: FileCollection) -> tu
     formula = f"=TAKE({op.table}!A:Z, {op.rows})"
 
     return lines, formula
+
+
+def _generate_select_columns_manual_steps(op: SelectColumnsOperation, tables: FileCollection) -> tuple:
+    """生成 select_columns 操作的手动步骤"""
+    try:
+        excel_file = tables.get_file(op.file_id)
+        filename = excel_file.filename
+    except Exception:
+        filename = "Excel 文件"
+
+    output_type = op.output.get("type", "in_place") if op.output else "in_place"
+    output_name = op.output.get("name", "结果") if op.output else "结果"
+    cols = "、".join([f"「{c}」" for c in op.columns])
+
+    if output_type == "new_sheet":
+        lines = [
+            f"   1. 打开 {filename}，切换到「{op.table}」工作表",
+            f"   2. 按住 Ctrl（或 Cmd）依次点击列标题，选中 {cols}",
+            f"   3. 按 Ctrl+C 复制选中列",
+            f"   4. 新建工作表，命名为「{output_name}」",
+            f"   5. 在 A1 单元格按 Ctrl+V 粘贴",
+        ]
+    else:
+        lines = [
+            f"   1. 打开 {filename}，切换到「{op.table}」工作表",
+            f"   2. 按住 Ctrl（或 Cmd）依次点击列标题，选中 {cols}",
+            f"   3. 右键选中列 →「复制」",
+            f"   4. 新建工作表，将 A1 作为粘贴起点粘贴",
+            f"   5. 删除原工作表，重命名新工作表为「{op.table}」",
+        ]
+
+    formula = _generate_select_columns_365_formula(op, tables)
+    return lines, formula
+
+
+def _generate_drop_columns_manual_steps(op: DropColumnsOperation, tables: FileCollection) -> tuple:
+    """生成 drop_columns 操作的手动步骤"""
+    try:
+        excel_file = tables.get_file(op.file_id)
+        filename = excel_file.filename
+    except Exception:
+        filename = "Excel 文件"
+
+    output_type = op.output.get("type", "in_place") if op.output else "in_place"
+    output_name = op.output.get("name", "结果") if op.output else "结果"
+    cols = "、".join([f"「{c}」" for c in op.columns])
+
+    if output_type == "new_sheet":
+        lines = [
+            f"   1. 打开 {filename}，切换到「{op.table}」工作表",
+            f"   2. 选中除 {cols} 外的所有列（可按住 Ctrl 逐列选择）",
+            f"   3. 按 Ctrl+C 复制选中列",
+            f"   4. 新建工作表，命名为「{output_name}」",
+            f"   5. 在 A1 单元格按 Ctrl+V 粘贴",
+        ]
+    else:
+        lines = [
+            f"   1. 打开 {filename}，切换到「{op.table}」工作表",
+            f"   2. 按住 Ctrl（或 Cmd）依次点击列标题，选中要删除的列：{cols}",
+            f"   3. 右键 →「删除」",
+        ]
+
+    formula = _generate_drop_columns_365_formula(op, tables)
+    return lines, formula
+
+
+def _generate_select_columns_365_formula(op: SelectColumnsOperation, tables: FileCollection) -> str:
+    """生成 select_columns 的 Excel 365 公式"""
+    table_name = op.table
+    try:
+        table = tables.get_table(op.file_id, table_name)
+        all_cols = table.get_columns()
+        indices = [str(all_cols.index(col) + 1) for col in op.columns]
+        return f"=CHOOSECOLS({table_name}!A:Z, {', '.join(indices)})"
+    except Exception:
+        if not op.columns:
+            return f"=CHOOSECOLS({table_name}!A:Z, ...)"
+        indices = [f'MATCH("{col}", {table_name}!1:1, 0)' for col in op.columns]
+        return f"=CHOOSECOLS({table_name}!A:Z, {', '.join(indices)})"
+
+
+def _generate_drop_columns_365_formula(op: DropColumnsOperation, tables: FileCollection) -> str:
+    """生成 drop_columns 的 Excel 365 公式"""
+    table_name = op.table
+    try:
+        table = tables.get_table(op.file_id, table_name)
+        all_cols = table.get_columns()
+        keep_cols = [col for col in all_cols if col not in op.columns]
+        indices = [str(all_cols.index(col) + 1) for col in keep_cols]
+        return f"=CHOOSECOLS({table_name}!A:Z, {', '.join(indices)})"
+    except Exception:
+        if not op.columns:
+            return f"=CHOOSECOLS({table_name}!A:Z, ...)"
+        drop_part = ", ".join([f'"{col}"' for col in op.columns])
+        return (
+            f"=CHOOSECOLS({table_name}!A:Z, "
+            f"FILTER(SEQUENCE(1, COLUMNS({table_name}!A:Z)), "
+            f"ISNA(MATCH({table_name}!1:1, {{{drop_part}}}, 0))))"
+        )
 
 
 def _generate_add_column_manual_steps(

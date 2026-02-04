@@ -12,6 +12,8 @@ from app.engine.models import (
     GroupByOperation,
     CreateSheetOperation,
     TakeOperation,
+    SelectColumnsOperation,
+    DropColumnsOperation,
     Operation,
 )
 
@@ -53,7 +55,8 @@ SCALAR_FUNCTIONS = {
 # 操作类型
 VALID_TYPES = {
     "aggregate", "add_column", "update_column", "compute",
-    "filter", "sort", "group_by", "create_sheet", "take"
+    "filter", "sort", "group_by", "create_sheet", "take",
+    "select_columns", "drop_columns"
 }
 
 # 筛选条件运算符
@@ -208,6 +211,10 @@ class OperationParser:
             return OperationParser._parse_create_sheet(op_data, prefix)
         elif op_type == "take":
             return OperationParser._parse_take(op_data, prefix)
+        elif op_type == "select_columns":
+            return OperationParser._parse_select_columns(op_data, prefix)
+        elif op_type == "drop_columns":
+            return OperationParser._parse_drop_columns(op_data, prefix)
 
         return None, [f"{prefix}: 未知操作类型 '{op_type}'"]
 
@@ -653,6 +660,104 @@ class OperationParser:
         return op, []
 
     @staticmethod
+    def _parse_select_columns(
+        op_data: Dict[str, Any], prefix: str
+    ) -> Tuple[Optional[SelectColumnsOperation], List[str]]:
+        """解析 select_columns 操作（列投影）"""
+        errors = []
+
+        # 必需字段
+        required = ["file_id", "table", "columns"]
+        for field in required:
+            if field not in op_data:
+                errors.append(f"{prefix}: 缺少必需字段 '{field}'")
+
+        if errors:
+            return None, errors
+
+        # 验证 columns
+        columns = op_data["columns"]
+        if not isinstance(columns, list) or len(columns) == 0:
+            errors.append(f"{prefix}: columns 必须是非空数组")
+        else:
+            if not all(isinstance(col, str) and col for col in columns):
+                errors.append(f"{prefix}: columns 必须是非空字符串数组")
+            if len(set(columns)) != len(columns):
+                errors.append(f"{prefix}: columns 不能包含重复列名")
+
+        # 验证 output（可选）
+        output = op_data.get("output", {"type": "in_place"})
+        if not isinstance(output, dict):
+            errors.append(f"{prefix}: output 必须是对象")
+        elif "type" not in output:
+            errors.append(f"{prefix}: output 缺少 'type' 字段")
+        elif output["type"] not in {"new_sheet", "in_place"}:
+            errors.append(f"{prefix}: output.type 必须是 'new_sheet' 或 'in_place'")
+        elif output["type"] == "new_sheet" and "name" not in output:
+            errors.append(f"{prefix}: output.type 为 'new_sheet' 时必须指定 'name'")
+
+        if errors:
+            return None, errors
+
+        op = SelectColumnsOperation(
+            file_id=op_data["file_id"],
+            table=op_data["table"],
+            columns=columns,
+            output=output,
+            description=op_data.get("description")
+        )
+        return op, []
+
+    @staticmethod
+    def _parse_drop_columns(
+        op_data: Dict[str, Any], prefix: str
+    ) -> Tuple[Optional[DropColumnsOperation], List[str]]:
+        """解析 drop_columns 操作（删除列）"""
+        errors = []
+
+        # 必需字段
+        required = ["file_id", "table", "columns"]
+        for field in required:
+            if field not in op_data:
+                errors.append(f"{prefix}: 缺少必需字段 '{field}'")
+
+        if errors:
+            return None, errors
+
+        # 验证 columns
+        columns = op_data["columns"]
+        if not isinstance(columns, list) or len(columns) == 0:
+            errors.append(f"{prefix}: columns 必须是非空数组")
+        else:
+            if not all(isinstance(col, str) and col for col in columns):
+                errors.append(f"{prefix}: columns 必须是非空字符串数组")
+            if len(set(columns)) != len(columns):
+                errors.append(f"{prefix}: columns 不能包含重复列名")
+
+        # 验证 output（可选）
+        output = op_data.get("output", {"type": "in_place"})
+        if not isinstance(output, dict):
+            errors.append(f"{prefix}: output 必须是对象")
+        elif "type" not in output:
+            errors.append(f"{prefix}: output 缺少 'type' 字段")
+        elif output["type"] not in {"new_sheet", "in_place"}:
+            errors.append(f"{prefix}: output.type 必须是 'new_sheet' 或 'in_place'")
+        elif output["type"] == "new_sheet" and "name" not in output:
+            errors.append(f"{prefix}: output.type 为 'new_sheet' 时必须指定 'name'")
+
+        if errors:
+            return None, errors
+
+        op = DropColumnsOperation(
+            file_id=op_data["file_id"],
+            table=op_data["table"],
+            columns=columns,
+            output=output,
+            description=op_data.get("description")
+        )
+        return op, []
+
+    @staticmethod
     def validate_operations(
         operations: List[Operation],
         file_sheets: Dict[str, List[str]]
@@ -743,6 +848,14 @@ class OperationParser:
             elif isinstance(op, TakeOperation):
                 check_file_and_sheet(op.file_id, op.table, prefix)
                 # 如果输出到新 sheet，注册它
+                if op.output and op.output.get("type") == "new_sheet":
+                    register_new_sheet(op.file_id, op.output["name"])
+            elif isinstance(op, SelectColumnsOperation):
+                check_file_and_sheet(op.file_id, op.table, prefix)
+                if op.output and op.output.get("type") == "new_sheet":
+                    register_new_sheet(op.file_id, op.output["name"])
+            elif isinstance(op, DropColumnsOperation):
+                check_file_and_sheet(op.file_id, op.table, prefix)
                 if op.output and op.output.get("type") == "new_sheet":
                     register_new_sheet(op.file_id, op.output["name"])
 

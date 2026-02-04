@@ -12,6 +12,8 @@ ANALYSIS_PROMPT = """
 ## 注意事项
 1. 用户需求中可能会存在简称，公式中使用完整的表名，不要使用简称。
 2. 使用尽量简洁少的步骤实现
+3. **跨表对比**必须先通过“关键列”（如 Country/ID）对齐，再比较数值；不要直接拿两张表的整列做比较。
+4. 若涉及“对比两表/找差异/同比环比”等需求，明确指出对齐字段，并说明需要先新增对齐列（通常用 VLOOKUP 或 COUNTIFS）。
 """
 
 
@@ -28,6 +30,14 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 - 每个操作必须指定 `file_id`（标识是哪个文件）
 - `table` 字段表示 sheet 名称（不是文件名）
 - 跨表引用格式为三段式：`file_id.sheet_name.column_name`
+
+## ⚠️ 跨表对比与对齐（必须遵守）
+
+当需求需要“对比两张表/跨年比较/找变化/找差异”时：
+- **必须先按关键列对齐（如 Country / ID / 名称）**，再进行数值比较。
+- 对齐方式：先用 `add_column` + `VLOOKUP`（或 `COUNTIFS`）把另一张表的值拉到当前表的**同一行**。
+- **禁止**在 `filter.conditions[].value` 中直接使用整列跨表引用（`{"ref": "file_id.sheet.col"}`），这不是标量，会导致错配。
+- `filter.conditions[].value` 必须是 **字面量** 或 **当前行可计算的标量**（如已对齐的新列）。
 
 **schemas 结构示例**：
 ```json
@@ -149,6 +159,10 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 
 **conditions 运算符**：`=`, `<>`, `>`, `<`, `>=`, `<=`, `contains`
 
+**重要补充**：
+- `conditions[].value` 必须是标量（字面量或当前行可计算结果）
+- 跨表比较请先 `add_column` 对齐，再在 `filter` 中比较同一行的列值
+
 **output.type**：
 - `new_sheet`: 结果写入新 Sheet（需指定 name）
 - `in_place`: 原地替换（会删除不符合条件的行）
@@ -228,6 +242,36 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 - `in_place`: 原地替换
 
 **常见用法**：配合 `group_by` + `sort` 实现 Top N 统计
+
+### 10. select_columns - 选择列（需要 Excel 365+）
+
+按指定列顺序输出结果，可输出到新 Sheet 或原地替换。
+
+```json
+{
+  "type": "select_columns",
+  "description": "用自然语言描述这一步操作的目的",
+  "file_id": "文件ID",
+  "table": "表名",
+  "columns": ["列名1", "列名2"],
+  "output": {"type": "new_sheet", "name": "新Sheet名"}
+}
+```
+
+### 11. drop_columns - 删除列（需要 Excel 365+）
+
+删除指定列，输出剩余列，可输出到新 Sheet 或原地替换。
+
+```json
+{
+  "type": "drop_columns",
+  "description": "用自然语言描述这一步操作的目的",
+  "file_id": "文件ID",
+  "table": "表名",
+  "columns": ["列名1", "列名2"],
+  "output": {"type": "in_place"}
+}
+```
 
 ---
 

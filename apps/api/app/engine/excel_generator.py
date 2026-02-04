@@ -10,6 +10,8 @@ from app.engine.models import (
     GroupByOperation,
     CreateSheetOperation,
     TakeOperation,
+    SelectColumnsOperation,
+    DropColumnsOperation,
 )
 
 
@@ -389,6 +391,48 @@ def generate_formulas(operations: List, tables: FileCollection) -> List[Dict]:
                 "note": "TAKE 函数需要 Excel 365 或 Excel 2021 及以上版本"
             })
 
+        elif isinstance(op, SelectColumnsOperation):
+            # select_columns 操作
+            excel_file = tables.get_file(op.file_id)
+            formula = _generate_select_columns_formula(op, generator)
+            output_type = op.output.get("type", "in_place") if op.output else "in_place"
+            output_name = op.output.get("name", op.table) if op.output else op.table
+            fallback_desc = f"从 {op.table} 表中选择指定列"
+            if output_type == "new_sheet":
+                fallback_desc += f"，结果输出到 {output_name}"
+            results.append({
+                "type": "select_columns",
+                "file_id": op.file_id,
+                "filename": excel_file.filename,
+                "sheet": op.table,
+                "output_sheet": output_name,
+                "formula": formula,
+                "description": _get_description(op, fallback_desc),
+                "excel_version": "Excel 365+",
+                "note": "CHOOSECOLS 函数需要 Excel 365 或 Excel 2021 及以上版本"
+            })
+
+        elif isinstance(op, DropColumnsOperation):
+            # drop_columns 操作
+            excel_file = tables.get_file(op.file_id)
+            formula = _generate_drop_columns_formula(op, generator)
+            output_type = op.output.get("type", "in_place") if op.output else "in_place"
+            output_name = op.output.get("name", op.table) if op.output else op.table
+            fallback_desc = f"从 {op.table} 表中删除指定列"
+            if output_type == "new_sheet":
+                fallback_desc += f"，结果输出到 {output_name}"
+            results.append({
+                "type": "drop_columns",
+                "file_id": op.file_id,
+                "filename": excel_file.filename,
+                "sheet": op.table,
+                "output_sheet": output_name,
+                "formula": formula,
+                "description": _get_description(op, fallback_desc),
+                "excel_version": "Excel 365+",
+                "note": "CHOOSECOLS 函数需要 Excel 365 或 Excel 2021 及以上版本"
+            })
+
         elif hasattr(op, 'function'):
             # aggregate 操作
             excel_file = tables.get_file(op.file_id)
@@ -589,6 +633,49 @@ def _generate_take_formula(op: TakeOperation, generator: ExcelFormulaGenerator) 
     return f"=TAKE({data_range}, {op.rows})"
 
 
+def _generate_select_columns_formula(op: SelectColumnsOperation, generator: ExcelFormulaGenerator) -> str:
+    """
+    生成 CHOOSECOLS 公式（选择列）
+
+    Excel 格式：=CHOOSECOLS(数据范围, 列索引1, 列索引2, ...)
+    """
+    table_name = op.table
+    file_id = op.file_id
+
+    try:
+        table = generator.tables.get_table(file_id, table_name)
+        columns = table.get_columns()
+        first_col = generator._find_column_letter(file_id, table_name, columns[0])
+        last_col = generator._find_column_letter(file_id, table_name, columns[-1])
+        data_range = f"{table_name}!{first_col}:{last_col}"
+        indices = [str(columns.index(col) + 1) for col in op.columns]
+        return f"=CHOOSECOLS({data_range}, {', '.join(indices)})"
+    except Exception:
+        return f"=CHOOSECOLS({table_name}!A:Z, ...)"
+
+
+def _generate_drop_columns_formula(op: DropColumnsOperation, generator: ExcelFormulaGenerator) -> str:
+    """
+    生成 CHOOSECOLS 公式（删除列）
+
+    Excel 格式：=CHOOSECOLS(数据范围, 保留列索引...)
+    """
+    table_name = op.table
+    file_id = op.file_id
+
+    try:
+        table = generator.tables.get_table(file_id, table_name)
+        columns = table.get_columns()
+        first_col = generator._find_column_letter(file_id, table_name, columns[0])
+        last_col = generator._find_column_letter(file_id, table_name, columns[-1])
+        data_range = f"{table_name}!{first_col}:{last_col}"
+        keep_cols = [col for col in columns if col not in op.columns]
+        indices = [str(columns.index(col) + 1) for col in keep_cols]
+        return f"=CHOOSECOLS({data_range}, {', '.join(indices)})"
+    except Exception:
+        return f"=CHOOSECOLS({table_name}!A:Z, ...)"
+
+
 def format_formula_output(formula_results: List[Dict]) -> str:
     """格式化公式输出"""
     lines = []
@@ -648,6 +735,22 @@ def format_formula_output(formula_results: List[Dict]) -> str:
             lines.append(f"   {result.get('note', '')}")
 
         elif op_type == "take":
+            lines.append(f"{i}. {result['description']}")
+            lines.append(f"   文件: {result['filename']}")
+            lines.append(f"   源表: {result['sheet']}")
+            lines.append(f"   输出表: {result['output_sheet']}")
+            lines.append(f"   公式: {result['formula']}")
+            lines.append(f"   ⚠️ {result.get('note', '')}")
+
+        elif op_type == "select_columns":
+            lines.append(f"{i}. {result['description']}")
+            lines.append(f"   文件: {result['filename']}")
+            lines.append(f"   源表: {result['sheet']}")
+            lines.append(f"   输出表: {result['output_sheet']}")
+            lines.append(f"   公式: {result['formula']}")
+            lines.append(f"   ⚠️ {result.get('note', '')}")
+
+        elif op_type == "drop_columns":
             lines.append(f"{i}. {result['description']}")
             lines.append(f"   文件: {result['filename']}")
             lines.append(f"   源表: {result['sheet']}")

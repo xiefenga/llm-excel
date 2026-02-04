@@ -37,14 +37,14 @@
 │                                                                     │
 │   ExcelProcessor.process(tables, query, config)                    │
 │                                                                     │
-│   ┌─────────┐    ┌────────────────────────────┐    ┌─────────┐    │
-│   │ analyze │ → │   GenerateValidateStage    │ → │ execute │    │
-│   └─────────┘    │  ┌────────┐  ┌──────────┐ │    └─────────┘    │
-│                  │  │generate│→│ validate │ │                    │
-│                  │  └────────┘  └──────────┘ │                    │
-│                  │       ↑           │       │                    │
-│                  │       └── 重试 ───┘       │                    │
-│                  └────────────────────────────┘                    │
+│   ┌────────────────────────────┐    ┌─────────┐                   │
+│   │   GenerateValidateStage    │ → │ execute │                   │
+│   │  ┌────────┐  ┌──────────┐ │    └─────────┘                   │
+│   │  │generate│→│ validate │ │                                   │
+│   │  └────────┘  └──────────┘ │                                   │
+│   │       ↑           │       │                                   │
+│   │       └── 重试 ───┘       │                                   │
+│   └────────────────────────────┘                                   │
 │                                                                     │
 │   输入: FileCollection, query, ProcessConfig                       │
 │   输出: Generator[ProcessEvent] → ProcessResult                    │
@@ -61,8 +61,8 @@
 │                                                                     │
 │   ┌────────────────┐  ┌────────────────┐  ┌────────────────┐       │
 │   │  llm_client    │  │    parser      │  │   executor     │       │
-│   │  .analyze()    │  │  .parse()      │  │  .execute()    │       │
-│   │  .generate()   │  │  .validate()   │  │               │       │
+│   │  .generate()   │  │  .parse()      │  │  .execute()    │       │
+│   │               │  │  .validate()   │  │               │       │
 │   └────────────────┘  └────────────────┘  └────────────────┘       │
 │                                                                     │
 │   ┌────────────────┐  ┌────────────────┐                           │
@@ -82,7 +82,6 @@
 
 ```python
 class ProcessStage(str, Enum):
-    ANALYZE = "analyze"    # LLM 需求分析
     GENERATE = "generate"  # LLM 生成操作
     VALIDATE = "validate"  # 验证操作
     EXECUTE = "execute"    # 执行操作
@@ -126,7 +125,6 @@ class ProcessConfig:
 ```python
 @dataclass
 class ProcessResult:
-    analysis: Optional[str]                    # 需求分析结果
     operations: Optional[Dict]                 # 生成的操作
     strategy: Optional[str]                    # 思路解读
     manual_steps: Optional[str]                # 快捷复现
@@ -228,7 +226,6 @@ apps/api/app/
 │   ├── excel_processor.py        # ExcelProcessor 实现
 │   └── stages/                   # 各阶段实现
 │       ├── __init__.py
-│       ├── analyze.py            # AnalyzeStage
 │       ├── generate.py           # GenerateStage（单独使用）
 │       ├── validate.py           # ValidateStage（单独使用）
 │       ├── generate_validate.py  # GenerateValidateStage（复合阶段）

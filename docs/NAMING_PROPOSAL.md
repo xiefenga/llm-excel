@@ -7,7 +7,7 @@
 ## 一、产品能力摘要
 
 - **核心**：用自然语言描述 Excel 处理需求，由 AI 生成可执行的结构化操作，输出预览、公式与可下载的 Excel 文件
-- **流程**：load → analyze → generate → execute → complete（对话式、可多轮修正）
+- **流程**：load → generate → validate → execute → complete（对话式、可多轮修正）
 - **特色**：100% 与 Excel 公式可复现、支持多文件/多 Sheet、流式反馈
 - **品牌意象**：AI 智能 + 数据/表格（绿 + 蓝）
 
@@ -37,7 +37,7 @@
 
 | 名称 | 含义 / 联想 | 特点 |
 |------|-------------|------|
-| **FormulaFlow** | 公式流 | 对应 load→analyze→generate→execute 的流水线 |
+| **FormulaFlow** | 公式流 | 对应 load→generate→validate→execute 的流水线 |
 | **Cellwise** | Cell + Wise，单元格智慧 | 简短、好记、偏工具感 |
 | **Gridify** | 把需求「网格化」 | 动词感、现代感 |
 | **Scribe** | 书记员 / 抄写员 | 帮用户「写」表格，有故事感 |

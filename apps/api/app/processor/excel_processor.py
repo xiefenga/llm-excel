@@ -10,7 +10,7 @@ from .types import (
     ProcessConfig,
     ProcessResult,
 )
-from .stages import AnalyzeStage, GenerateValidateStage, ExecuteStage
+from .stages import GenerateValidateStage, ExecuteStage
 from .stages.analyze import StageError
 
 if TYPE_CHECKING:
@@ -56,7 +56,6 @@ class ExcelProcessor:
 
         # 创建各阶段实例（线性列表，保持可扩展性）
         self._stages = [
-            # AnalyzeStage(llm_client),
             GenerateValidateStage(llm_client),  # 复合阶段：生成+验证（支持重试）
             ExecuteStage(),
         ]

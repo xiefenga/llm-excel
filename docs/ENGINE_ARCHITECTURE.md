@@ -431,18 +431,7 @@ class ExecutionResult:
    │ FileCollection  │ ← 两层结构，包含所有文件和 sheets
    └─────────────────┘
 
-2️⃣ 需求分析（LLM）
-   ┌─────────────────┐
-   │ schemas =       │
-   │ collection.     │ → 传给 LLM
-   │ get_schemas()   │
-   └────────┬────────┘
-            ↓
-   ┌─────────────────┐
-   │  LLM 分析       │ → 返回操作描述 JSON
-   └─────────────────┘
-
-3️⃣ 操作生成与验证（GenerateValidateStage 复合阶段）
+2️⃣ 操作生成与验证（GenerateValidateStage 复合阶段）
    ┌─────────────────────────────────────┐
    │  GenerateValidateStage              │
    │  ┌─────────────────┐                │
@@ -463,7 +452,7 @@ class ExecutionResult:
                ↓
    List[Operation] (包含 file_id，已验证)
 
-4️⃣ 执行操作
+3️⃣ 执行操作
    ┌─────────────────┐
    │  Executor       │ ← 接收已验证的操作
    │  .execute()     │
@@ -482,7 +471,7 @@ class ExecutionResult:
    │ ExecutionResult │ ← variables, new_columns, errors
    └─────────────────┘
 
-5️⃣ 导出结果
+4️⃣ 导出结果
    ┌─────────────────┐
    │ collection.     │
    │ apply_new_      │ → 将新列应用到 Table

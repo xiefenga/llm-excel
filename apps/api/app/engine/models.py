@@ -262,6 +262,42 @@ class TakeOperation:
             raise ValueError("rows 不能为 0")
 
 
+@dataclass
+class SelectColumnsOperation:
+    """
+    选择列操作（Excel 365+ CHOOSECOLS 函数）
+
+    按指定列顺序投影输出，可输出到新 Sheet 或原地替换
+    """
+    file_id: str
+    table: str
+    columns: List[str]
+    output: Optional[Dict[str, Any]] = None  # {"type": "new_sheet", "name": "..."} 或 {"type": "in_place"}
+    description: Optional[str] = None
+
+    def __post_init__(self):
+        if self.output is None:
+            self.output = {"type": "in_place"}
+
+
+@dataclass
+class DropColumnsOperation:
+    """
+    删除列操作（Excel 365+ CHOOSECOLS 函数）
+
+    删除指定列，输出剩余列到新 Sheet 或原地替换
+    """
+    file_id: str
+    table: str
+    columns: List[str]
+    output: Optional[Dict[str, Any]] = None  # {"type": "new_sheet", "name": "..."} 或 {"type": "in_place"}
+    description: Optional[str] = None
+
+    def __post_init__(self):
+        if self.output is None:
+            self.output = {"type": "in_place"}
+
+
 # 操作类型联合
 Operation = Union[
     AggregateOperation,
@@ -272,7 +308,9 @@ Operation = Union[
     SortOperation,
     GroupByOperation,
     CreateSheetOperation,
-    TakeOperation
+    TakeOperation,
+    SelectColumnsOperation,
+    DropColumnsOperation
 ]
 
 

@@ -370,3 +370,8 @@
     background-clip: padding-box;
   }
 }
+
+html,
+body {
+  overscroll-behavior-x: contain;
+}

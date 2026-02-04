@@ -222,7 +222,6 @@
 @dataclass
 class ProcessResult:
     # 各阶段输出
-    analysis: Optional[str] = None
     operations: Optional[List] = None     # 操作列表（JSON 序列化后的操作对象）
     strategy: Optional[str] = None        # 思路解读
     manual_steps: Optional[str] = None    # 快捷复现

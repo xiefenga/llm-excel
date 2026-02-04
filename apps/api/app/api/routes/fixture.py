@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -257,3 +258,64 @@ async def list_all_cases(
     except Exception as e:
         logger.exception(f"列出用例失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取列表失败: {e}")
+
+
+@router.get("/dataset/{scenario_id}/{filename}")
+async def get_dataset_file(scenario_id: str, filename: str):
+    """
+    获取场景的数据集文件
+
+    用于前端预览数据集内容。
+
+    Args:
+        scenario_id: 场景 ID（如 "01-titanic"）
+        filename: 数据集文件名（如 "titanic.xlsx"）
+
+    Returns:
+        文件内容（FileResponse）
+    """
+    service = get_fixture_service()
+
+    try:
+        # 加载场景
+        scenario = service.load_scenario(scenario_id)
+
+        # 查找数据集
+        dataset = next(
+            (ds for ds in scenario.datasets if ds.file == filename), None
+        )
+        if not dataset:
+            raise HTTPException(
+                status_code=404, detail=f"数据集不存在: {filename}"
+            )
+
+        # 检查文件是否存在
+        if not dataset.path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"数据集文件不存在: {dataset.path}"
+            )
+
+        # 根据文件扩展名确定 MIME 类型
+        suffix = dataset.path.suffix.lower()
+        media_type_map = {
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".xls": "application/vnd.ms-excel",
+            ".csv": "text/csv",
+        }
+        media_type = media_type_map.get(suffix, "application/octet-stream")
+
+        return FileResponse(
+            path=dataset.path,
+            filename=filename,
+            media_type=media_type,
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception(f"获取数据集文件失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取文件失败: {e}")

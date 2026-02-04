@@ -22,15 +22,8 @@
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│               第一步：LLM 需求分析 (analyze)                 │
-│    - 理解用户意图                                           │
-│    - 分析涉及的表和字段                                      │
-│    - 给出清晰的操作步骤（Excel 公式形式）                     │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│            第二步：LLM 生成 JSON 操作描述 (generate)         │
-│    - 基于分析结果生成结构化操作                               │
+│                LLM 生成 JSON 操作描述 (generate)            │
+│    - 基于用户需求生成结构化操作                               │
 │    - 输出 operations 数组                                   │
 │    - formula/expression 使用 JSON 表达式对象                 │
 └─────────────────────────────────────────────────────────────┘
@@ -50,51 +43,23 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**处理流程（Pipeline）**：`load → analyze → generate → execute → complete`
+**处理流程（Pipeline）**：`load → generate → validate → execute → complete`
 
 详见 [SSE_SPEC.md](./SSE_SPEC.md) 了解完整的事件协议。
 
-### 1.4 两步 LLM 流程说明
+### 1.4 单步 LLM 流程说明
 
-采用两步 LLM 流程的原因：
+当前系统采用**单步 LLM 生成流程**：
 
-1. **提高准确性**：先让 LLM 用自然语言分析需求，再生成结构化 JSON，降低直接生成 JSON 的出错率
-2. **更好的推理**：第一步的分析结果作为上下文传递给第二步，帮助 LLM 更准确地生成操作
-3. **可追溯性**：分析结果通过 SSE 流式返回给前端，用户可以看到 LLM 的思考过程
+1. 直接根据用户需求与表结构信息生成结构化 JSON 操作
+2. 解析器负责格式校验与函数白名单校验
+3. 失败时由系统触发重试或返回错误
 
-> **注意**：当前实现是自动化流程，两步在一次请求中连续完成。如果用户对结果不满意，可以通过继续会话（传入 `thread_id`）来修正需求。
-
-#### 第一步：需求分析 (analyze)
+#### LLM 生成操作描述 (generate)
 
 **输入**：
 
 - 用户需求（自然语言）
-- 表结构信息
-
-**输出**：
-
-- 需求理解说明
-- 操作步骤（Excel 公式形式）
-- 涉及的表和字段
-
-**示例输出**：
-
-```
-根据需求分析：
-
-1. 需要在"贴现发生额明细"表中新增一列"卖断"
-2. 判断逻辑：检查当前行的"票据(包)号"和"子票区间"是否在"卖断发生额明细"表中存在
-3. Excel 公式思路：
-   =IF(COUNTIFS(卖断发生额明细!A:A, A2, 卖断发生额明细!B:B, B2) > 0, "已卖断", "未卖断")
-4. 结果：匹配到则显示"已卖断"，否则显示"未卖断"
-```
-
-#### 第二步：生成操作描述 (generate)
-
-**输入**：
-
-- 用户需求
-- 第一步的分析结果
 - 表结构信息
 
 **输出**：
@@ -117,6 +82,8 @@
 | `sort`          | 排序行       | 表 + 排序规则  | 排序后的表 | **Excel 365+** |
 | `group_by`      | 分组聚合     | 表 + 分组列    | 聚合结果表 | **Excel 365+** |
 | `take`          | 取前/后N行   | 表 + 行数      | 截取后的表 | **Excel 365+** |
+| `select_columns`| 选择列       | 表 + 列清单    | 投影后的表 | **Excel 365+** |
+| `drop_columns`  | 删除列       | 表 + 列清单    | 剩余列表   | **Excel 365+** |
 | `create_sheet`  | 创建新 Sheet | 配置           | 新 Sheet   | 内部抽象       |
 
 ---
@@ -1029,6 +996,98 @@
 
 ---
 
+### 2.11 select_columns（选择列）⚠️ Excel 365+
+
+按指定列顺序投影输出。对应 Excel 365 的 `CHOOSECOLS` 函数。
+
+#### 结构定义
+
+```json
+{
+  "type": "select_columns",
+  "file_id": "文件ID",
+  "table": "表名",
+  "columns": ["列名1", "列名2"],
+  "output": {
+    "type": "in_place | new_sheet",
+    "name": "新Sheet名（可选）"
+  }
+}
+```
+
+#### 字段说明
+
+| 字段         | 类型   | 必需 | 说明                                              |
+| ------------ | ------ | ---- | ------------------------------------------------- |
+| `file_id`    | string | ✅   | 文件 ID                                           |
+| `table`      | string | ✅   | Sheet 名称                                        |
+| `columns`    | array  | ✅   | 要保留的列名数组（顺序即输出顺序）                 |
+| `output`     | object | ❌   | 输出目标，默认 `{"type": "in_place"}`             |
+| `output.type`| string | ❌   | `"in_place"` 或 `"new_sheet"`                     |
+| `output.name`| string | ❌   | 新 Sheet 名称（type 为 new_sheet 时必需）          |
+
+#### 示例
+
+```json
+// 只保留 Country、Score 两列，输出到新 Sheet
+{
+  "type": "select_columns",
+  "file_id": "xxx-xxx",
+  "table": "countries",
+  "columns": ["Country", "Score"],
+  "output": {"type": "new_sheet", "name": "国家得分"}
+}
+// Excel: =CHOOSECOLS(countries!A:Z, 1, 4)
+```
+
+---
+
+### 2.12 drop_columns（删除列）⚠️ Excel 365+
+
+删除指定列，输出剩余列。对应 Excel 365 的 `CHOOSECOLS` 函数。
+
+#### 结构定义
+
+```json
+{
+  "type": "drop_columns",
+  "file_id": "文件ID",
+  "table": "表名",
+  "columns": ["列名1", "列名2"],
+  "output": {
+    "type": "in_place | new_sheet",
+    "name": "新Sheet名（可选）"
+  }
+}
+```
+
+#### 字段说明
+
+| 字段         | 类型   | 必需 | 说明                                              |
+| ------------ | ------ | ---- | ------------------------------------------------- |
+| `file_id`    | string | ✅   | 文件 ID                                           |
+| `table`      | string | ✅   | Sheet 名称                                        |
+| `columns`    | array  | ✅   | 要删除的列名数组                                  |
+| `output`     | object | ❌   | 输出目标，默认 `{"type": "in_place"}`             |
+| `output.type`| string | ❌   | `"in_place"` 或 `"new_sheet"`                     |
+| `output.name`| string | ❌   | 新 Sheet 名称（type 为 new_sheet 时必需）          |
+
+#### 示例
+
+```json
+// 删除不需要的列，原地替换
+{
+  "type": "drop_columns",
+  "file_id": "xxx-xxx",
+  "table": "countries",
+  "columns": ["Region", "Rank"],
+  "output": {"type": "in_place"}
+}
+// Excel: =CHOOSECOLS(countries!A:Z, 1, 3, 4, 5, 6)
+```
+
+---
+
 ## 三、JSON 输出格式
 
 ### 3.1 完整结构
@@ -1166,27 +1225,43 @@ JSON 操作描述
 #### 操作类型校验
 
 ```python
-VALID_TYPES = {"aggregate", "add_column", "compute"}
+VALID_TYPES = {
+  "aggregate", "add_column", "update_column", "compute",
+  "filter", "sort", "group_by", "take", "create_sheet",
+  "select_columns", "drop_columns"
+}
 ```
 
 #### aggregate 必需字段
 
 | 函数                                  | 必需字段                                                       |
 | ------------------------------------- | -------------------------------------------------------------- |
-| SUM, COUNT, COUNTA, AVERAGE, MIN, MAX | type, function, table, column, as                              |
-| SUMIF, AVERAGEIF                      | type, function, table, column, condition_column, condition, as |
-| COUNTIF                               | type, function, table, condition_column, condition, as         |
+| SUM, COUNT, COUNTA, AVERAGE, MIN, MAX | type, function, file_id, table, column, as                     |
+| SUMIF, AVERAGEIF                      | type, function, file_id, table, column, condition_column, condition, as |
+| COUNTIF                               | type, function, file_id, table, condition_column, condition, as |
 
 #### add_column 必需字段
 
 ```
-type, table, name, formula
+type, file_id, table, name, formula
 ```
 
 #### compute 必需字段
 
 ```
 type, expression, as
+```
+
+#### update_column 必需字段
+
+```
+type, file_id, table, column, formula
+```
+
+#### filter/sort/group_by/take/select/drop 必需字段
+
+```
+type, file_id, table, (具体字段见操作定义)
 ```
 
 ### 4.3 函数白名单
@@ -1300,44 +1375,13 @@ expression: "order_total - refund_total"
 
 系统采用两步 LLM 流程，对应两个提示词。
 
-### 6.1 第一步：需求分析提示词
-
-```text
-# 角色
-你是一个 Excel 数据处理专家。
-
-## 任务
-分析用户的数据处理需求，给出清晰的操作步骤（Excel 公式形式）。
-
-## 注意事项
-1. 用户需求中可能会存在简称，公式中使用完整的表名，不要使用简称
-2. 使用尽量简洁少的步骤实现
-3. 明确指出涉及的表和字段
-4. 给出对应的 Excel 公式思路
-
-## 当前表结构信息
-（系统自动注入表结构）
-```
-
-**示例输出**：
-
-```
-根据需求分析：
-
-1. 需要在"贴现发生额明细"表中新增一列"卖断"
-2. 判断逻辑：检查当前行的"票据(包)号"和"子票区间"是否在"卖断发生额明细"表中存在
-3. Excel 公式思路：
-   =IF(COUNTIFS(卖断发生额明细!A:A, A2, 卖断发生额明细!B:B, B2) > 0, "已卖断", "未卖断")
-4. 结果：匹配到则显示"已卖断"，否则显示"未卖断"
-```
-
-### 6.2 第二步：生成操作描述提示词
+### 6.1 操作生成提示词
 
 ```text
 你是一个数据处理助手。
 
 ## 任务
-根据需求分析结果，生成 JSON 格式的操作描述。
+根据用户需求和表结构信息，生成 JSON 格式的操作描述。
 
 ## 输出格式
 
@@ -1455,8 +1499,6 @@ expression: "order_total - refund_total"
 - formula 和 expression 必须是 JSON 对象，不是字符串
 - 如果无法处理，输出：{"error": "UNSUPPORTED", "reason": "原因"}
 
-## 需求分析结果
-（系统自动注入第一步的分析结果）
 ```
 
 ---
@@ -1470,9 +1512,9 @@ expression: "order_total - refund_total"
 | 函数库         | `functions.py`       | 聚合函数、行级函数、标量函数实现 |
 | 执行引擎       | `executor.py`        | 按顺序执行操作、JSON 表达式求值  |
 | Excel 公式生成 | `excel_generator.py` | JSON 表达式 → Excel 公式映射     |
-| LLM 客户端     | `llm_client.py`      | 调用 LLM API（两步流程）         |
-| 系统提示词     | `prompt.py`          | 需求分析提示词 + 操作生成提示词  |
-| 主入口         | `main.py`            | 应用主入口、两步流程控制         |
+| LLM 客户端     | `llm_client.py`      | 调用 LLM API（单步生成）         |
+| 系统提示词     | `prompt.py`          | 操作生成提示词                   |
+| 主入口         | `main.py`            | 应用主入口、单步流程控制         |
 
 ---
 
@@ -1489,11 +1531,11 @@ expression: "order_total - refund_total"
    ↓
 5. excel_generator.py # Excel 公式生成
    ↓
-6. prompt.py          # 两步提示词
-   ↓
-7. llm_client.py      # LLM 客户端（两步调用）
-   ↓
-8. main.py            # 集成 + 两步流程控制
+6. prompt.py          # 操作生成提示词
+  ↓
+7. llm_client.py      # LLM 客户端（单步调用）
+  ↓
+8. main.py            # 集成 + 单步流程控制
 ```
 
 ---
@@ -1566,6 +1608,7 @@ expression: "order_total - refund_total"
 | SORTBY  | 按指定列排序 | Excel 365+           | sort     |
 | GROUPBY | 分组聚合     | Excel 365+ (2023.09) | group_by |
 | TAKE    | 取前/后 N 行 | Excel 365+           | take     |
+| CHOOSECOLS | 选择列/删除列 | Excel 365+        | select_columns / drop_columns |
 | UNIQUE  | 去重         | Excel 365+           | 未实现   |
 
 ---
@@ -1597,9 +1640,11 @@ expression: "order_total - refund_total"
 | 排序         | ✅   | sort 操作                      | SORT()     |
 | 分组聚合     | ✅   | group_by 操作                  | GROUPBY()  |
 | 取前/后 N 行 | ✅   | take 操作                      | TAKE()     |
+| 选择列       | ✅   | select_columns 操作            | CHOOSECOLS() |
+| 删除列       | ✅   | drop_columns 操作              | CHOOSECOLS() |
 | 创建新 Sheet | ✅   | create_sheet 操作（隐式/显式） | 无         |
 
-> ⚠️ **版本提醒**：filter、sort、group_by、take 操作生成的 Excel 公式需要 Excel 365 或 Excel 2021 及以上版本。其中 GROUPBY 函数需要 2023年9月更新版本的 Excel 365。
+> ⚠️ **版本提醒**：filter、sort、group_by、take、select_columns、drop_columns 操作生成的 Excel 公式需要 Excel 365 或 Excel 2021 及以上版本。其中 GROUPBY 函数需要 2023年9月更新版本的 Excel 365。
 
 ### 不支持的能力
 
@@ -1607,5 +1652,5 @@ expression: "order_total - refund_total"
 | ---------- | ---- | ------------------------- |
 | 自由 JOIN  | ❌   | 不支持（用 VLOOKUP 替代） |
 | 自定义函数 | ❌   | 不支持                    |
-| 删除行/列  | ❌   | 用 filter 筛选替代        |
+| 删除行     | ❌   | 用 filter 筛选替代        |
 | 透视表     | ❌   | 用 group_by 替代          |
