@@ -8,7 +8,7 @@ import type { Route } from "./+types/_auth";
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "LLM Excel" },
+    { title: "Selgetabel" },
     { name: "description", content: "使用 LLM 处理 Excel 数据" },
   ];
 }

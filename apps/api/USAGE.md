@@ -1,4 +1,4 @@
-# LLM Excel 使用指南
+# Selgetabel 使用指南
 
 ## 快速开始
 

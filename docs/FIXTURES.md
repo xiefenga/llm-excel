@@ -4,7 +4,7 @@
 
 ## 目录概述
 
-`fixtures/` 目录存放 LLM Excel 系统的测试数据和用例定义，用于验证系统对 Excel 数据处理的准确性。
+`fixtures/` 目录存放 Selgetabel 系统的测试数据和用例定义，用于验证系统对 Excel 数据处理的准确性。
 
 ```
 fixtures/
@@ -179,7 +179,7 @@ def run_group_tests(group_id: str):
         # 1. 加载数据集
         datasets = load_datasets(case["scenario_id"], case["datasets"])
 
-        # 2. 发送 prompt 到 LLM Excel API
+        # 2. 发送 prompt 到 Selgetabel API
         result = call_llm_excel_api(datasets, case["prompt"])
 
         # 3. 验证结果

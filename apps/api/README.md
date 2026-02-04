@@ -1,4 +1,4 @@
-# LLM Excel API
+# Selgetabel API
 
 LLM 辅助 Excel 数据处理系统的 API 服务。
 

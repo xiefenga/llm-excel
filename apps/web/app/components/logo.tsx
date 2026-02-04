@@ -150,7 +150,7 @@ export function LogoWithText({
       <Logo size={size} />
       <div className={textClassName}>
         <span className="text-xl font-bold tracking-tight text-foreground">
-          Excel<span className="text-blue-600">AI</span>
+          Selge<span className="text-emerald-600">tabel</span>
         </span>
       </div>
     </div>

@@ -38,9 +38,9 @@ const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
             )}
           </button>
           <div className="flex items-center gap-1">
-            <Logo size={40} />
+            <Logo size={36} />
             <h1 className="text-2xl font-bold bg-linear-to-r from-emerald-700 via-teal-700 to-blue-700 bg-clip-text text-transparent">
-              LLM Excel
+              Selgetabel
             </h1>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 ## 概述
 
-`ExcelProcessor` 是 LLM Excel 系统的核心处理器，封装了所有 LLM + Excel 处理逻辑。设计目标是实现核心逻辑与外围关注点的分离，使 Fixture 测试和 Chat API 能够共用同一套处理流程。
+`ExcelProcessor` 是 Selgetabel 系统的核心处理器，封装了所有 LLM + Excel 处理逻辑。设计目标是实现核心逻辑与外围关注点的分离，使 Fixture 测试和 Chat API 能够共用同一套处理流程。
 
 ## 设计目标
 

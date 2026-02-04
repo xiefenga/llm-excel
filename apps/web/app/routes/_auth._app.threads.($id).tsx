@@ -4,7 +4,7 @@ import type { Route } from './+types/_auth._app.threads.($id)'
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: '任务处理 - LLM Excel' },
+    { title: '任务处理 - Selgetabel' },
     { name: 'description', content: '使用 LLM 处理 Excel 数据' },
   ]
 }

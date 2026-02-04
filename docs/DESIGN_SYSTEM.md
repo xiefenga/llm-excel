@@ -1,10 +1,10 @@
-# LLM Excel 设计系统文档
+# Selgetabel 设计系统文档
 
 > **版本**: 1.0.0
 > **最后更新**: 2026-02-03
 > **适用范围**: `apps/web` 前端应用
 
-本文档定义了 LLM Excel 项目的视觉设计规范，包括品牌色、主题色、字体、间距、圆角等设计 token，以确保产品视觉一致性和可维护性。
+本文档定义了 Selgetabel 项目的视觉设计规范，包括品牌色、主题色、字体、间距、圆角等设计 token，以确保产品视觉一致性和可维护性。
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 1.1 品牌理念
 
-LLM Excel 是一款 **AI 驱动的 Excel 智能处理工具**，品牌视觉融合了两个核心概念：
+Selgetabel 是一款 **AI 驱动的 Excel 智能处理工具**，品牌视觉融合了两个核心概念：
 
 - **Excel / 数据** → 绿色系（Emerald）- 代表数据、表格、准确性
 - **AI / 智能** → 蓝色系（Blue）- 代表智能、科技、创新
@@ -59,9 +59,9 @@ import { LogoWithText } from "~/components/logo";
 
 ### 1.4 品牌名称
 
-- **完整名称**: LLM Excel
+- **完整名称**: Selgetabel
 - **标题样式**: 使用渐变色 `from-emerald-700 via-teal-700 to-blue-700`
-- **简称**: ExcelAI（Logo 中的文字）
+- **简称**: Selgetabel（Logo 中的文字）
 
 ---
 
@@ -147,7 +147,7 @@ import { LogoWithText } from "~/components/logo";
 
 ### 2.5 业务语义色
 
-针对 LLM Excel 业务场景定义的语义色。
+针对 Selgetabel 业务场景定义的语义色。
 
 #### 步骤状态色
 
