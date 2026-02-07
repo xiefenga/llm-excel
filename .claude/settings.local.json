@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -m py_compile:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(chmod:*)",
+      "Bash(ls:*)"
     ]
   }
 }

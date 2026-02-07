@@ -11,6 +11,15 @@ from app.api.main import api_router
 from app.schemas.response import ApiResponse
 from app.core.database import get_db
 from app.core.init_permissions import init_permissions
+from app.core.version_check import verify_versions_on_startup
+
+# 导入版本信息
+try:
+    from app.__version__ import __version__, __build_time__
+except ImportError:
+    # 如果版本文件不存在（开发环境未生成），使用默认值
+    __version__ = "0.0.0-dev"
+    __build_time__ = "unknown"
 
 load_dotenv()
 
@@ -32,12 +41,18 @@ OPENAPI_DESCRIPTION = """
 async def lifespan(app: FastAPI):
     """应用生命周期"""
     # 启动时初始化权限系统
-    print("🚀 初始化应用...")
+    print(f"🚀 Selgetabel API v{__version__} 启动中...")
+    print(f"   构建时间: {__build_time__}")
+
     async for db in get_db():
         try:
+            # 版本检查（非严格模式，只打印警告）
+            await verify_versions_on_startup(db, strict=False)
+
+            # 权限系统初始化
             await init_permissions(db)
         except Exception as e:
-            print(f"❌ 权限系统初始化失败: {e}")
+            print(f"❌ 初始化失败: {e}")
         break
     print("✅ 应用初始化完成")
 
@@ -50,7 +65,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LLM Excel API",
     description=OPENAPI_DESCRIPTION,
-    version="0.1.0",
+    version=__version__,  # 使用动态版本
     lifespan=lifespan,
 )
 
@@ -61,6 +76,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_version_header(request: Request, call_next):
+    """在所有响应中添加版本头"""
+    response = await call_next(request)
+    response.headers["X-App-Version"] = __version__
+    return response
 
 
 @app.exception_handler(HTTPException)
@@ -93,6 +116,27 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def root():
     """根路径重定向到 API 文档"""
     return RedirectResponse(url="/docs")
+
+
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    """健康检查端点（用于 Docker 健康检查）"""
+    return {
+        "status": "ok",
+        "version": __version__,
+    }
+
+
+@app.get("/version", include_in_schema=False)
+async def get_version():
+    """获取应用版本信息"""
+    return {
+        "app": {
+            "name": "Selgetabel",
+            "version": __version__,
+            "build_time": __build_time__,
+        }
+    }
 
 
 app.include_router(api_router)

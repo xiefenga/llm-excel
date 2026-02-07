@@ -1,6 +1,12 @@
 # 开发环境：仅 PostgreSQL + MinIO
-# 使用：docker compose -f docker-compose.dev.yml up -d
-# 需配置根目录 .env（见 .env.example）
+# 用于本地开发，前后端在宿主机运行
+#
+# 使用：
+#   cd docker
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# 然后在项目根目录：
+#   pnpm dev  # 启动前后端
 
 services:
   postgres:
@@ -8,22 +14,27 @@ services:
     container_name: selgetabel-dev-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-llmexcel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-llmexcel}
+      POSTGRES_USER: llmexcel
+      POSTGRES_PASSWORD: llmexcel
+      POSTGRES_DB: llmexcel
     ports:
       - "5432:5432"
     volumes:
       - selgetabel_postgres_dev_data:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmexcel -d llmexcel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio
     container_name: selgetabel-dev-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -31,6 +42,11 @@ services:
     volumes:
       - selgetabel_minio_dev_data:/data
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   selgetabel_postgres_dev_data:

@@ -92,9 +92,9 @@ All formulas use JSON objects (not strings) to avoid parsing ambiguity:
 - `OPENAI_MODEL` (optional)
 
 **File Storage:**
-- Uploaded/output files stored in `storage/` directory
-- Accessible via `/storage/*` static route
-- Docker: mounted as volume `api_storage`
+- Files stored in MinIO object storage
+- MinIO accessible at `http://localhost:9000` (API), `http://localhost:9001` (Console)
+- Default credentials in `.env` file
 
 ### Frontend (apps/web)
 
@@ -179,19 +179,26 @@ The `/excel/chat` endpoint streams Server-Sent Events:
 
 ```bash
 # Build and start with docker-compose
-docker compose up --build
+cd docker
+docker compose up --build -d
 
 # Access points
 # - Web: http://localhost:8080
 # - API (via Nginx): http://localhost:8080/api/*
-# - Storage: http://localhost:8080/storage/*
+# - MinIO Console: http://localhost:9001
 ```
 
 **Environment Variables for Docker:**
-Set in `.env` at project root:
+Set in `docker/.env` (copy from `docker/.env.example`):
 - `OPENAI_MODEL`
 - `OPENAI_BASE_URL`
 - `OPENAI_API_KEY`
+- `POSTGRES_PASSWORD`
+- `MINIO_ROOT_PASSWORD`
+- `JWT_SECRET_KEY`
+
+**Production Deployment:**
+See `docker/README.md` for detailed deployment guide.
 
 ## Code Conventions
 

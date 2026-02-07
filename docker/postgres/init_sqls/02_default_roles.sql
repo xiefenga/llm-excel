@@ -1,0 +1,6 @@
+BEGIN;
+INSERT INTO "public"."roles" ("id", "name", "code", "description", "is_system", "created_at", "updated_at") VALUES ('a5eb57b2-8e32-41d5-836b-7282b05df40d', '系统管理员', 'admin', '拥有所有权限，可管理用户、角色、权限', 't', '2026-02-06 18:20:44.297621+00', '2026-02-06 18:20:44.297629+00');
+INSERT INTO "public"."roles" ("id", "name", "code", "description", "is_system", "created_at", "updated_at") VALUES ('2751c212-c193-4225-82b1-6fc0cc850f05', '普通用户', 'user', '基础用户权限，可使用核心功能', 't', '2026-02-06 18:20:44.3116+00', '2026-02-06 18:20:44.311606+00');
+INSERT INTO "public"."roles" ("id", "name", "code", "description", "is_system", "created_at", "updated_at") VALUES ('dc91ea35-de5b-4520-80a1-21fa69721b4a', '访客', 'guest', '只读权限，用于演示或试用', 't', '2026-02-06 18:20:44.315946+00', '2026-02-06 18:20:44.315949+00');
+INSERT INTO "public"."roles" ("id", "name", "code", "description", "is_system", "created_at", "updated_at") VALUES ('4c88b1ce-a02c-4626-83d1-37da793fa568', '运营人员', 'operator', '可查看所有数据，管理异常记录', 't', '2026-02-06 18:20:44.318188+00', '2026-02-06 18:20:44.318192+00');
+COMMIT;

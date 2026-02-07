@@ -1,3 +1,15 @@
 .turbo
 node_modules
 .env
+
+# 自动生成的版本文件
+apps/api/app/__version__.py
+apps/web/app/__version__.ts
+
+# Docker 数据目录（保留 README 和 .gitkeep）
+docker/db_data/*.sql
+docker/minio_data/*
+!docker/minio_data/README.md
+!docker/minio_data/.gitkeep
+!docker/minio_data/default_avatar.png
+!docker/minio_data/admin_avatar.svg
