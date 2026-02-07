@@ -9,8 +9,9 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.schemas.response import ApiResponse
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, check_permission, has_permission
 from app.core.database import get_db
+from app.core.permissions import Permissions
 from app.models.user import User
 from app.models.thread import Thread, ThreadTurn
 
@@ -38,21 +39,43 @@ class ThreadDetail(BaseModel):
     turns: List[dict] = Field(default_factory=list, description="消息列表")
 
 
-@router.get("", response_model=ApiResponse[List[ThreadListItem]], summary="获取线程列表", description="获取当前用户的所有线程列表")
-async def get_threads(limit: int = 50, offset: int = 0, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """获取用户的线程列表"""
+@router.get("", response_model=ApiResponse[List[ThreadListItem]], summary="获取线程列表", description="获取线程列表（根据权限决定范围）")
+async def get_threads(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(check_permission(Permissions.THREAD_READ)),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取线程列表
+
+    权限要求：
+    - thread:read: 查看自己的线程
+    - thread:read:all: 查看所有用户的线程
+    """
     try:
+        # 检查用户是否有查看所有线程的权限
+        can_view_all = await has_permission(
+            current_user,
+            db,
+            Permissions.THREAD_READ_ALL
+        )
+
         # 查询线程，按更新时间倒序
         stmt = (
             select(Thread, func.count(ThreadTurn.id).label("turn_count"))
             .outerjoin(ThreadTurn, Thread.id == ThreadTurn.thread_id)
-            .where(Thread.user_id == current_user.id)
             .where(Thread.status == "active")
             .group_by(Thread.id)
             .order_by(Thread.updated_at.desc())
             .limit(limit)
             .offset(offset)
         )
+
+        # 如果没有查看所有线程的权限，只查询自己的线程
+        if not can_view_all:
+            stmt = stmt.where(Thread.user_id == current_user.id)
+
         result = await db.execute(stmt)
         rows = result.all()
 

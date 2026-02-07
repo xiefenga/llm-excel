@@ -120,6 +120,20 @@ async def register_user(db: AsyncSession, username: str, email: str, password: s
     db.add(account)
     await db.flush()
 
+    # 分配默认角色（普通用户）
+    from app.models.role import Role, UserRole
+    stmt = select(Role).where(Role.code == "user")
+    result = await db.execute(stmt)
+    user_role = result.scalar_one_or_none()
+
+    if user_role:
+        user_role_association = UserRole(
+            user_id=user.id,
+            role_id=user_role.id,
+        )
+        db.add(user_role_association)
+        await db.flush()
+
     return user
 
 

@@ -1,8 +1,13 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router'
 
 const IndexPage = () => {
   const navigate = useNavigate();
-  navigate("/threads");
+  useEffect(() => {
+    navigate("/threads");
+  }, [navigate]);
+
+  return null
 }
 
 export default IndexPage

@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 from app.api.main import api_router
 from app.schemas.response import ApiResponse
+from app.core.database import get_db
+from app.core.init_permissions import init_permissions
 
 load_dotenv()
 
@@ -29,7 +31,20 @@ OPENAPI_DESCRIPTION = """
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期"""
+    # 启动时初始化权限系统
+    print("🚀 初始化应用...")
+    async for db in get_db():
+        try:
+            await init_permissions(db)
+        except Exception as e:
+            print(f"❌ 权限系统初始化失败: {e}")
+        break
+    print("✅ 应用初始化完成")
+
     yield
+
+    # 关闭时清理
+    print("👋 应用正在关闭...")
 
 
 app = FastAPI(

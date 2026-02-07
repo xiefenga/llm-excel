@@ -1,16 +1,17 @@
-import { useNavigate, useParams } from "react-router";
 import { Menu, X, Plus } from "lucide-react";
+import { useNavigate, useParams } from "react-router";
 
 import { Logo } from "~/components/logo";
-import { UserMenu } from "~/components/user-menu";
 import { Button } from "~/components/ui/button";
+import { UserMenu } from "~/components/user-menu";
 
 interface Props {
   sidebarOpen: boolean;
   onSidebarOpenChange: (open: boolean) => void;
+  isThreadPage?: boolean;
 }
 
-const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
+const AppHeader = ({ sidebarOpen, onSidebarOpenChange, isThreadPage = false }: Props) => {
   const navigate = useNavigate();
   const params = useParams();
 
@@ -26,17 +27,19 @@ const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
       <div className="flex h-16 items-center justify-between px-4 lg:px-6">
         {/* Left: Logo and Menu */}
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => onSidebarOpenChange(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="切换侧边栏"
-          >
-            {sidebarOpen ? (
-              <X className="w-5 h-5 text-gray-700" />
-            ) : (
-              <Menu className="w-5 h-5 text-gray-700" />
-            )}
-          </button>
+          {isThreadPage && (
+            <button
+              onClick={() => onSidebarOpenChange(!sidebarOpen)}
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="切换侧边栏"
+            >
+              {!sidebarOpen ? (
+                <X className="w-5 h-5 text-gray-700" />
+              ) : (
+                <Menu className="w-5 h-5 text-gray-700" />
+              )}
+            </button>
+          )}
           <div className="flex items-center gap-1">
             <Logo size={36} />
             <h1 className="text-2xl font-bold bg-linear-to-r from-emerald-700 via-teal-700 to-blue-700 bg-clip-text text-transparent">
@@ -45,7 +48,7 @@ const AppHeader = ({ sidebarOpen, onSidebarOpenChange }: Props) => {
           </div>
         </div>
 
-        {/* Right: New Task Button & User Avatar & Menu */}
+        {/* Right: Admin Link & New Task Button & User Menu */}
         <div className="flex items-center gap-3">
           {isInTask && (
             <Button

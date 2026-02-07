@@ -1,11 +1,13 @@
 """API 依赖"""
 
-from typing import Optional
+from typing import Optional, List, Union
 from uuid import UUID
 
 from fastapi import HTTPException, Depends, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.engine.llm_client import LLMClient
 from app.core.database import get_db
@@ -17,6 +19,7 @@ from app.services.auth import (
     get_user_roles,
 )
 from app.models.user import User
+from app.models.role import Permission
 
 # HTTP Bearer Token 认证（作为备用方案，优先使用 cookie）
 security = HTTPBearer(auto_error=False)
@@ -140,3 +143,186 @@ async def get_current_user(
         detail="未提供有效的访问令牌",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+# ==================== 权限系统 ====================
+
+
+async def get_user_permissions(user: User, db: AsyncSession) -> List[str]:
+    """
+    获取用户的所有权限
+
+    Args:
+        user: 用户对象
+        db: 数据库会话
+
+    Returns:
+        用户权限代码列表
+    """
+    permissions = set()
+
+    # 重新查询用户，预加载角色和权限
+    from app.models.role import Role
+
+    stmt = (
+        select(User)
+        .options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        )
+        .where(User.id == user.id)
+    )
+    result = await db.execute(stmt)
+    user_with_relations = result.scalar_one_or_none()
+
+    if not user_with_relations:
+        return []
+
+    # 通过用户的角色获取权限
+    for role in user_with_relations.roles:
+        for permission in role.permissions:
+            permissions.add(permission.code)
+
+    return list(permissions)
+
+
+def _match_permission_pattern(pattern: List[str], target: List[str]) -> bool:
+    """
+    匹配权限通配符模式
+
+    Args:
+        pattern: 权限模式（可能包含通配符 *）
+        target: 目标权限
+
+    Returns:
+        是否匹配
+    """
+    if len(pattern) != len(target):
+        return False
+
+    for p, t in zip(pattern, target):
+        if p != "*" and p != t:
+            return False
+
+    return True
+
+
+def check_permission(
+    required_permission: Union[str, List[str]],
+    match_all: bool = False
+):
+    """
+    检查权限的依赖注入函数
+
+    Args:
+        required_permission: 必需的权限代码或权限代码列表
+        match_all: 如果为 True，需要匹配所有权限；否则匹配任意一个即可
+
+    Returns:
+        依赖函数
+
+    Raises:
+        HTTPException: 权限不足时抛出 403
+    """
+    async def _check_permission(
+        user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+    ) -> User:
+        # 获取用户权限
+        user_permissions = await get_user_permissions(user, db)
+
+        # 检查超级权限
+        if "*:*" in user_permissions:
+            return user
+
+        # 标准化为列表
+        required_permissions = (
+            required_permission if isinstance(required_permission, list)
+            else [required_permission]
+        )
+
+        # 检查通配符权限
+        matched_permissions = set()
+        for user_perm in user_permissions:
+            if "*" in user_perm:
+                # 解析通配符权限
+                pattern_parts = user_perm.split(":")
+                for req_perm in required_permissions:
+                    req_parts = req_perm.split(":")
+                    # 模式匹配
+                    if _match_permission_pattern(pattern_parts, req_parts):
+                        matched_permissions.add(req_perm)
+
+        # 精确匹配
+        for req_perm in required_permissions:
+            if req_perm in user_permissions:
+                matched_permissions.add(req_perm)
+
+        # 判断是否满足权限要求
+        if match_all:
+            # 需要匹配所有权限
+            if len(matched_permissions) >= len(required_permissions):
+                return user
+        else:
+            # 匹配任意一个权限即可
+            if len(matched_permissions) > 0:
+                return user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足"
+        )
+
+    return _check_permission
+
+
+async def has_permission(
+    user: User,
+    db: AsyncSession,
+    required_permission: Union[str, List[str]],
+    match_all: bool = False
+) -> bool:
+    """
+    检查用户是否拥有指定权限（用于业务逻辑中的权限判断）
+
+    Args:
+        user: 用户对象
+        db: 数据库会话
+        required_permission: 必需的权限代码或权限代码列表
+        match_all: 如果为 True，需要匹配所有权限；否则匹配任意一个即可
+
+    Returns:
+        是否拥有权限
+    """
+    user_permissions = await get_user_permissions(user, db)
+
+    # 检查超级权限
+    if "*:*" in user_permissions:
+        return True
+
+    # 标准化为列表
+    required_permissions = (
+        required_permission if isinstance(required_permission, list)
+        else [required_permission]
+    )
+
+    # 检查通配符权限
+    matched_permissions = set()
+    for user_perm in user_permissions:
+        if "*" in user_perm:
+            pattern_parts = user_perm.split(":")
+            for req_perm in required_permissions:
+                req_parts = req_perm.split(":")
+                if _match_permission_pattern(pattern_parts, req_parts):
+                    matched_permissions.add(req_perm)
+
+    # 精确匹配
+    for req_perm in required_permissions:
+        if req_perm in user_permissions:
+            matched_permissions.add(req_perm)
+
+    # 判断是否满足权限要求
+    if match_all:
+        return len(matched_permissions) >= len(required_permissions)
+    else:
+        return len(matched_permissions) > 0
+

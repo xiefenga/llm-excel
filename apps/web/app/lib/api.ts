@@ -21,6 +21,26 @@ export interface ApiResponse<T> {
   msg: string;
 }
 
+export interface BTrackItem {
+  id: string;
+  reporter_id: string;
+  reporter_name: string;
+  created_at: string;
+  steps: Array<Record<string, unknown>>;
+  generation_prompt: string;
+  errors: string[];
+  thread_turn_id: string;
+  cause: string | null;
+  fixed: boolean;
+}
+
+export interface BTrackListResponse {
+  items: BTrackItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface SSEMessage {
   action: "load" | "analysis" | "generate" | "execute";
   status: "start" | "done" | "error";
@@ -294,6 +314,110 @@ export interface ThreadDetail {
   updated_at: string;
   turns: ThreadTurn[];
 }
+
+// 获取 BTrack 列表
+export async function getBTracks(params: {
+  limit?: number;
+  offset?: number;
+  fixed?: boolean;
+} = {}): Promise<BTrackListResponse> {
+  try {
+    const res = await axios.get<ApiResponse<BTrackListResponse>>(`${API_BASE}/btracks`, {
+      params,
+    });
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 导出 BTrack 数据
+export async function exportBTracks(params: {
+  fixed?: boolean;
+} = {}): Promise<void> {
+  try {
+    const res = await axios.get(`${API_BASE}/btracks/export`, {
+      params,
+      responseType: 'blob',
+    });
+
+    // 创建下载链接
+    const blob = new Blob([res.data], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // 从响应头获取文件名，如果没有则使用默认名称
+    const contentDisposition = res.headers['content-disposition'];
+    let filename = `btracks_export_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "导出失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("导出失败");
+  }
+}
+
+// ============ 认证相关 ============
+
+export interface UserInfo {
+  id: string;
+  username: string;
+  avatar: string | null;
+  status: number;
+  accounts: {
+    email: string;
+  };
+  roles: string[];
+  permissions: string[];
+  created_at: string;
+  last_login_at: string | null;
+}
+
+// 获取当前用户信息
+export async function getUserInfo(): Promise<UserInfo> {
+  try {
+    const res = await axios.get<ApiResponse<UserInfo>>(`${API_BASE}/auth/me`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取用户信息失败");
+    }
+    if (!res.data.data) {
+      throw new Error("用户信息不存在");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取用户信息失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取用户信息失败");
+  }
+}
+
+// ============ 线程管理 ============
 
 // 获取线程列表
 export async function getThreads(): Promise<ThreadListItem[]> {

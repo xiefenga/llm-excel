@@ -1,28 +1,32 @@
 import NiceModal from '@ebay/nice-modal-react';
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { LogOut, MessageCircle, Settings, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { logout } from "~/api/auth";
 import { useAuthStore } from "~/stores/auth";
 import UserProfileDialog from "~/components/user-profile-dialog";
+import { usePermission, useRole } from '~/hooks/use-permission';
+import { Permissions } from '~/lib/permissions';
+import invariant from 'tiny-invariant';
 
 export const UserMenu = () => {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
 
-  if (!user) {
-    return null;
-  }
+  // 权限检查 - 是否显示管理入口
+  const isAdmin = useRole("admin");
+  const canViewUsers = usePermission(Permissions.USER_READ);
+  const canViewBTracks = usePermission(Permissions.BTRACK_READ);
+  const showAdminLink = isAdmin || canViewUsers || canViewBTracks;
+
+  invariant(user)
 
   const handleLogout = async () => {
     try {
       await logout();
+    } finally {
+      await navigate("/login");
       clearUser();
-      navigate("/login");
-    } catch (error) {
-      console.error("登出失败:", error);
-      clearUser();
-      navigate("/login");
     }
   };
 
@@ -85,13 +89,18 @@ export const UserMenu = () => {
             <span>个人信息</span>
           </button>
 
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
-          >
-            <Settings className="h-4 w-4 text-brand" />
-            <span>设置</span>
-          </button>
+          {showAdminLink && (
+            <Link to="/admin">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
+              >
+                <Settings className="h-4 w-4 text-brand" />
+                <span>系统管理</span>
+              </button>
+            </Link>
+          )}
+
 
 
 
