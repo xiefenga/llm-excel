@@ -260,7 +260,7 @@ async def _init_session(
         title = thread.title or ""
     else:
         # 创建新线程
-        llm_client = get_llm_client()
+        llm_client = await get_llm_client(repo.db)
         title = await asyncio.to_thread(generate_thread_title, query, llm_client)
         thread = await repo.create_thread(user_id, title)
         thread_id = thread.id

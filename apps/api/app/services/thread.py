@@ -34,8 +34,8 @@ def generate_thread_title(query: str, llm_client: LLMClient) -> Optional[str]:
 """
 
     try:
-        # 调用 LLM 生成标题
-        title = llm_client._call_llm(system_prompt, query)
+        # 调用 LLM 生成标题（使用 title 阶段路由）
+        title = llm_client.call_llm("title", system_prompt, query)
 
         # 清理标题：去除可能的引号、换行等
         title = title.strip().strip('"').strip("'").strip()

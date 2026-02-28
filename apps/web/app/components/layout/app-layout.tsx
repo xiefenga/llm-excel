@@ -6,7 +6,7 @@ import ThreadSidebar from "~/components/thread-sidebar";
 
 import type { PropsWithChildren } from "react";
 
-export function AppLayout({ children }: PropsWithChildren) {
+const AppLayout = ({ children }: PropsWithChildren) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // threads 或 threads/:id 才显示 sidebar
@@ -50,6 +50,6 @@ export function AppLayout({ children }: PropsWithChildren) {
       </div>
     </div>
   );
-}
+};
 
 export default AppLayout;

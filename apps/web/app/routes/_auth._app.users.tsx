@@ -1,5 +1,7 @@
 import UserManagementPage from "~/features/admin/user-management-page";
 
-export default function UsersRoute() {
+const UsersRoute = () => {
   return <UserManagementPage />;
-}
+};
+
+export default UsersRoute;

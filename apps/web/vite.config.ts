@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), svgr()],
+    ssr: {
+      noExternal: [/^@lobehub\//, /^@emoji-mart\//, /^emoji-mart/],
+    },
     server: {
       proxy: {
         "/api": {

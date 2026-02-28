@@ -5,10 +5,11 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Shield, Loader2, AlertCircle } from "lucide-react";
+import { Shield, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Link } from "react-router";
 import dayjs from "dayjs";
 
-import { getUsers, getRoles, getUserRoles, assignRoles, type UserListItem, type RoleInfo } from "~/lib/permission-api";
+import { getUsers, getRoles, getUserRoles, assignRoles, type UserListItem } from "~/lib/permission-api";
 import { usePermission } from "~/hooks/use-permission";
 import { Permissions } from "~/lib/permissions";
 import { Button } from "~/components/ui/button";
@@ -40,32 +41,27 @@ const UserManagementPage = () => {
   const limit = 20;
   const queryClient = useQueryClient();
 
-  // 权限检查
   const canManageUsers = usePermission(Permissions.USER_READ);
   const canAssignRoles = usePermission(Permissions.USER_ASSIGN_ROLE);
 
-  // 获取用户列表
   const { data: usersData, isLoading: usersLoading, isError: usersError } = useQuery({
     queryKey: ["users", { limit, offset }],
     queryFn: () => getUsers({ limit, offset }),
     enabled: canManageUsers,
   });
 
-  // 获取所有角色
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
     queryFn: getRoles,
     enabled: canManageUsers,
   });
 
-  // 获取用户角色
   const { data: userRoles, isLoading: userRolesLoading } = useQuery({
     queryKey: ["userRoles", selectedUser?.id],
     queryFn: () => getUserRoles(selectedUser!.id),
     enabled: !!selectedUser,
   });
 
-  // 分配角色 Mutation
   const assignRolesMutation = useMutation({
     mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
       assignRoles(userId, roleIds),
@@ -106,21 +102,18 @@ const UserManagementPage = () => {
 
   const handleSaveRoles = () => {
     if (!selectedUser) return;
-
     assignRolesMutation.mutate({
       userId: selectedUser.id,
       roleIds: selectedRoleIds,
     });
   };
 
-  // 当用户角色加载完成时，初始化选中的角色
   useEffect(() => {
     if (userRoles) {
       setSelectedRoleIds(userRoles.roles.map((r) => r.id));
     }
   }, [userRoles]);
 
-  // 权限检查
   if (!canManageUsers) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -136,153 +129,147 @@ const UserManagementPage = () => {
   }
 
   return (
-    <div className="h-full overflow-hidden">
-      <div className="h-full overflow-y-auto">
-        <div className="flex w-full flex-col gap-6 px-4 py-6 lg:px-8">
-          {/* Header */}
-          <section className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900">
-                  用户管理
-                </h1>
-                <p className="text-xs text-slate-500">
-                  管理系统用户及其角色分配
-                </p>
-              </div>
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 border-b px-4 py-3">
+        <Button asChild size="icon-sm" variant="ghost">
+          <Link to="/admin">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <h1 className="text-base font-semibold">用户管理</h1>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-4 lg:px-6">
+          {usersLoading && (
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              加载中...
             </div>
-          </section>
+          )}
 
-          {/* User List */}
-          <section className="grid gap-4">
-            {usersLoading && (
-              <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 py-16 text-slate-500">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                正在加载用户列表...
-              </div>
-            )}
+          {usersError && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
+              获取失败，请稍后重试
+            </div>
+          )}
 
-            {usersError && (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-                获取失败，请稍后重试
-              </div>
-            )}
+          {!usersLoading && items.length === 0 && (
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              暂无用户
+            </div>
+          )}
 
-            {!usersLoading && items.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500">
-                暂无用户
-              </div>
-            )}
-
-            {!usersLoading && items.length > 0 && (
-              <div className="overflow-hidden rounded-xl border border-white/70 bg-white/85 shadow-sm">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50/80 text-xs uppercase tracking-[0.2em] text-slate-400">
-                      <TableHead>用户</TableHead>
-                      <TableHead className="text-center">状态</TableHead>
-                      <TableHead>角色</TableHead>
-                      <TableHead className="text-center">创建时间</TableHead>
-                      <TableHead className="text-center">最后登录</TableHead>
+          {!usersLoading && items.length > 0 && (
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs">
+                    <TableHead>用户</TableHead>
+                    <TableHead className="text-center">状态</TableHead>
+                    <TableHead>角色</TableHead>
+                    <TableHead className="text-center">创建时间</TableHead>
+                    <TableHead className="text-center">最后登录</TableHead>
+                    {canAssignRoles && (
                       <TableHead className="text-center">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={user.avatar || "/storage/llm-excel/__SYS__/default_avatar.png"}
-                              alt={user.username}
-                              className="h-8 w-8 rounded-full object-cover"
-                            />
-                            <span className="font-medium">{user.username}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span
-                            className={`inline-block rounded-full px-2 py-1 text-xs ${
-                              user.status === 0
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {user.status === 0 ? "正常" : "禁用"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {user.roles.length > 0 ? (
-                              user.roles.map((role) => (
-                                <span
-                                  key={role.id}
-                                  className="inline-block rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700"
-                                >
-                                  {role.name}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400">无角色</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center text-slate-600">
-                          {dayjs(user.created_at).format("YYYY-MM-DD")}
-                        </TableCell>
-                        <TableCell className="text-center text-slate-600">
-                          {user.last_login_at
-                            ? dayjs(user.last_login_at).format("YYYY-MM-DD HH:mm")
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {canAssignRoles && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleManageRoles(user)}
-                            >
-                              <Shield className="mr-1 h-4 w-4" />
-                              管理角色
-                            </Button>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={user.avatar || "/storage/llm-excel/__SYS__/default_avatar.png"}
+                            alt={user.username}
+                            className="h-7 w-7 rounded-full object-cover"
+                          />
+                          <span className="text-sm font-medium">{user.username}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs ${
+                            user.status === 0
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {user.status === 0 ? "正常" : "禁用"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {user.roles.length > 0 ? (
+                            user.roles.map((role) => (
+                              <span
+                                key={role.id}
+                                className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
+                              >
+                                {role.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">无角色</span>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-xs text-muted-foreground">
+                        {dayjs(user.created_at).format("YYYY-MM-DD")}
+                      </TableCell>
+                      <TableCell className="text-center text-xs text-muted-foreground">
+                        {user.last_login_at
+                          ? dayjs(user.last_login_at).format("YYYY-MM-DD HH:mm")
+                          : "-"}
+                      </TableCell>
+                      {canAssignRoles && (
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleManageRoles(user)}
+                          >
+                            <Shield className="mr-1 h-3.5 w-3.5" />
+                            角色
+                          </Button>
                         </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </section>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           {/* Pagination */}
-          <section className="flex items-center justify-between px-4 py-3 text-sm text-slate-500">
-            <div>
-              第 {Math.floor(offset / limit) + 1} 页 · 共{" "}
-              {Math.max(Math.ceil(total / limit), 1)} 页
+          {total > limit && (
+            <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground">
+              <span>
+                第 {Math.floor(offset / limit) + 1} / {Math.ceil(total / limit)} 页
+              </span>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!canPrev}
+                  onClick={() => setOffset(Math.max(offset - limit, 0))}
+                >
+                  上一页
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!canNext}
+                  onClick={() => setOffset(offset + limit)}
+                >
+                  下一页
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!canPrev}
-                onClick={() => setOffset(Math.max(offset - limit, 0))}
-              >
-                上一页
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!canNext}
-                onClick={() => setOffset(offset + limit)}
-              >
-                下一页
-              </Button>
-            </div>
-          </section>
+          )}
         </div>
       </div>
 

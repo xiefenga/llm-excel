@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 
 import DataFlowAnimation from "~/features/auth/data-flow-animation";
 
-export function AuthLayout({ children }: PropsWithChildren) {
+export const AuthLayout = ({ children }: PropsWithChildren) => {
   return (
     <div className="h-screen flex relative overflow-hidden bg-gray-50">
       {/* CSS Animations */}
@@ -153,4 +153,4 @@ export function AuthLayout({ children }: PropsWithChildren) {
       </div>
     </div>
   );
-}
+};

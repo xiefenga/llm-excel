@@ -41,20 +41,7 @@ OPENAPI_DESCRIPTION = """
 async def lifespan(app: FastAPI):
     """应用生命周期"""
     # 启动时初始化权限系统
-    print(f"🚀 Selgetabel API v{__version__} 启动中...")
-    print(f"   构建时间: {__build_time__}")
-
-    async for db in get_db():
-        try:
-            # 版本检查（非严格模式，只打印警告）
-            await verify_versions_on_startup(db, strict=False)
-
-            # 权限系统初始化
-            await init_permissions(db)
-        except Exception as e:
-            print(f"❌ 初始化失败: {e}")
-        break
-    print("✅ 应用初始化完成")
+    print(f"🚀 Selgetabel API v{__version__}  {__build_time__}")
 
     yield
 

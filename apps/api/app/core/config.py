@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: Optional[str] = None  # 兼容 .env 中的旧变量名
     OPENAI_MODEL: Optional[str] = None
 
+    # LLM 机密信息加密密钥（Fernet），迁移期可为空
+    LLM_SECRET_KEY: Optional[str] = None
+
 
 settings = Settings()
-

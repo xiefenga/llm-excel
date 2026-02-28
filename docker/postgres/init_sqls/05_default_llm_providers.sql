@@ -1,0 +1,7 @@
+BEGIN;
+INSERT INTO "public"."llm_providers" ("id", "name", "type", "base_url", "status", "capabilities", "created_at", "updated_at") VALUES ('3f8fcb5b-5c1f-4f6d-8c1f-7b8e6f3f0a01', 'OpenAI', 'openai', 'https://api.openai.com/v1', 1, '{}'::jsonb, '2026-02-12 10:30:00+00', '2026-02-12 10:30:00+00');
+INSERT INTO "public"."llm_providers" ("id", "name", "type", "base_url", "status", "capabilities", "created_at", "updated_at") VALUES ('2b7f3c26-9c4c-4d7c-9b2e-4c3d7a9f2b02', 'OpenAI-Compatible', 'openai_compatible', NULL, 1, '{}'::jsonb, '2026-02-12 10:30:00+00', '2026-02-12 10:30:00+00');
+INSERT INTO "public"."llm_providers" ("id", "name", "type", "base_url", "status", "capabilities", "created_at", "updated_at") VALUES ('6b1a4f79-7c42-4d0f-8d5c-9f1b8c2d1c03', 'Ollama', 'ollama', NULL, 1, '{}'::jsonb, '2026-02-12 10:30:00+00', '2026-02-12 10:30:00+00');
+INSERT INTO "public"."llm_providers" ("id", "name", "type", "base_url", "status", "capabilities", "created_at", "updated_at") VALUES ('9d6b2a14-3a3f-4c21-9b64-3c1f8e7b2d04', 'Anthropic', 'anthropic', NULL, 1, '{}'::jsonb, '2026-02-12 10:30:00+00', '2026-02-12 10:30:00+00');
+INSERT INTO "public"."llm_providers" ("id", "name", "type", "base_url", "status", "capabilities", "created_at", "updated_at") VALUES ('7a5c1e24-6e2f-4a1b-9f84-5a2b7c1d3e05', 'Gemini', 'gemini', NULL, 1, '{}'::jsonb, '2026-02-12 10:30:00+00', '2026-02-12 10:30:00+00');
+COMMIT;

@@ -1,5 +1,7 @@
 import BTrackPage from "~/features/btrack/btrack-page";
 
-export default function AdminBTracksRoute() {
+const AdminBTracksRoute = () => {
   return <BTrackPage />;
-}
+};
+
+export default AdminBTracksRoute;

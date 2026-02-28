@@ -1,10 +1,13 @@
-"""LLM 客户端模块 - 负责与 OpenAI API 交互，支持两步流程"""
+"""LLM 客户端模块 - 通过 Provider 适配层调用 LLM，支持两步流程"""
 
 import logging
-import os
 import asyncio
 from typing import Optional, Dict, List, Generator, Tuple, AsyncGenerator
-from openai import OpenAI
+from app.engine.llm_providers import ProviderRegistry
+from app.engine.llm_types import (
+    LLMStageConfig,
+    LLMRequest,
+)
 from app.engine.prompt import (
     get_analysis_prompt_with_schema,
     get_generation_prompt_with_context,
@@ -22,32 +25,48 @@ class LLMClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None
+        stage_configs: Dict[str, LLMStageConfig],
+        provider_registry: Optional[ProviderRegistry] = None,
     ):
         """
         初始化 LLM 客户端
 
         Args:
-            api_key: OpenAI API Key
-            base_url: OpenAI API Base URL
-            model: 模型名称
+            stage_configs: 阶段路由配置（stage -> LLMStageConfig），必须从数据库加载
+            provider_registry: Provider Registry（可注入用于扩展或测试）
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
-        self.model = model or os.getenv("OPENAI_MODEL")
+        if not stage_configs:
+            raise ValueError("未配置 LLM 路由，请在管理后台配置 llm_stage_routes。")
+        self.stage_configs = stage_configs
+        self.provider_registry = provider_registry or ProviderRegistry()
 
-        if not self.api_key:
-            raise ValueError("未设置 OPENAI_API_KEY 环境变量")
+    def _resolve_stage_config(self, stage: str) -> LLMStageConfig:
+        if stage in self.stage_configs:
+            return self.stage_configs[stage]
+        if "default" in self.stage_configs:
+            return self.stage_configs["default"]
+        raise ValueError(f"未配置 LLM 路由: {stage}")
 
-        client_kwargs = {"api_key": self.api_key}
-        if self.base_url:
-            client_kwargs["base_url"] = self.base_url
+    def _build_request(
+        self,
+        stage_config: LLMStageConfig,
+        messages: List[Dict[str, str]],
+    ) -> LLMRequest:
+        defaults = stage_config.model.defaults or {}
+        return LLMRequest(
+            model_id=stage_config.model.model_id,
+            messages=messages,
+            temperature=defaults.get("temperature", 0),
+            max_tokens=defaults.get("max_tokens"),
+            response_format=defaults.get("response_format"),
+            extra_params=defaults.get("extra_params") or {},
+        )
 
-        self.client = OpenAI(**client_kwargs)
+    def call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
+        """对外公开的 LLM 调用（非流式）"""
+        return self._call_llm(stage, system_prompt, user_message)
 
-    def _call_llm(self, system_prompt: str, user_message: str) -> str:
+    def _call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
         """
         调用 LLM
 
@@ -59,10 +78,16 @@ class LLMClient:
             LLM 响应内容
         """
 
+        stage_config = self._resolve_stage_config(stage)
+        provider = stage_config.provider
+        model = stage_config.model
+
         log_msg = (
             "\n"
             "[LLM 调用] 非流式\n"
-            f"[模型] {self.model}\n"
+            f"[阶段] {stage}\n"
+            f"[Provider] {provider.name} ({provider.type})\n"
+            f"[模型] {model.model_id}\n"
             "[System Prompt]\n"
             f"{system_prompt}\n"
             "[User Message]\n"
@@ -76,15 +101,10 @@ class LLMClient:
             { "role": "user", "content": user_message }
         ]
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0,
-            extra_body={
-                "enable_thinking": False
-            }
-        )
-        result = response.choices[0].message.content.strip()
+        request = self._build_request(stage_config, messages)
+        adapter = self.provider_registry.get_adapter(provider)
+        response = adapter.complete(request)
+        result = response.content.strip()
 
         logger.info(f"\n[LLM 响应内容]\n{result}")
 
@@ -92,6 +112,7 @@ class LLMClient:
 
     def _call_llm_stream(
         self,
+        stage: str,
         system_prompt: str,
         user_message: Optional[str] = None,
         messages: Optional[List[Dict[str, str]]] = None
@@ -119,10 +140,16 @@ class LLMClient:
             ]
 
         # 打印提示词日志
+        stage_config = self._resolve_stage_config(stage)
+        provider = stage_config.provider
+        model = stage_config.model
+
         log_msg = (
             "\n"
             "[LLM 调用] 流式\n"
-            f"[模型] {self.model}\n"
+            f"[阶段] {stage}\n"
+            f"[Provider] {provider.name} ({provider.type})\n"
+            f"[模型] {model.model_id}\n"
             f"[消息数] {len(full_messages)}\n"
             "[System Prompt]\n"
             f"{system_prompt}\n"
@@ -132,26 +159,22 @@ class LLMClient:
 
         logger.info(log_msg)
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=full_messages,
-            temperature=0,
-            stream=True,
-            extra_body={
-                "enable_thinking": False
-            }
-        )
+        request = self._build_request(stage_config, full_messages)
+        adapter = self.provider_registry.get_adapter(provider)
 
         full_content = ""
-        for chunk in response:
-            if chunk.choices and chunk.choices[0].delta.content:
-                delta = chunk.choices[0].delta.content
-                full_content += delta
-                yield delta, full_content
+        for chunk in adapter.stream(request):
+            full_content = chunk.full_content
+            yield chunk.delta, chunk.full_content
 
         logger.info(f"\n[LLM 响应内容]\n{full_content}")
 
-    async def _call_llm_stream_async(self, system_prompt: str, user_message: str) -> AsyncGenerator[Tuple[str, str], None]:
+    async def _call_llm_stream_async(
+        self,
+        stage: str,
+        system_prompt: str,
+        user_message: str,
+    ) -> AsyncGenerator[Tuple[str, str], None]:
         """
         流式调用 LLM（异步版本）
 
@@ -170,7 +193,7 @@ class LLMClient:
         def stream_in_thread():
             """在后台线程中执行流式调用"""
             try:
-                for item in self._call_llm_stream(system_prompt, user_message):
+                for item in self._call_llm_stream(stage, system_prompt, user_message):
                     # 使用 call_soon_threadsafe 安全地放入队列
                     loop.call_soon_threadsafe(queue.put_nowait, item)
                 # 发送结束信号
@@ -206,7 +229,7 @@ class LLMClient:
         system_prompt = get_analysis_prompt_with_schema(table_schemas)
 
         try:
-            result = self._call_llm(system_prompt, user_requirement)
+            result = self._call_llm("analyze", system_prompt, user_requirement)
             return result
         except Exception as e:
             raise RuntimeError(f"需求分析失败: {str(e)}") from e
@@ -225,7 +248,7 @@ class LLMClient:
         system_prompt = get_analysis_prompt_with_schema(table_schemas)
 
         try:
-            yield from self._call_llm_stream(system_prompt, user_requirement)
+            yield from self._call_llm_stream("analyze", system_prompt, user_requirement)
         except Exception as e:
             raise RuntimeError(f"需求分析失败: {str(e)}") from e
 
@@ -243,7 +266,7 @@ class LLMClient:
         system_prompt = get_analysis_prompt_with_schema(table_schemas)
 
         try:
-            async for item in self._call_llm_stream_async(system_prompt, user_requirement):
+            async for item in self._call_llm_stream_async("analyze", system_prompt, user_requirement):
                 yield item
         except Exception as e:
             raise RuntimeError(f"需求分析失败: {str(e)}") from e
@@ -289,7 +312,7 @@ class LLMClient:
             user_message += "\n请根据错误信息修正 JSON，确保所有字段名、表名、列名都正确。"
 
         try:
-            result = self._call_llm(system_prompt, user_message)
+            result = self._call_llm("generate", system_prompt, user_message)
             return self._clean_json_response(result)
         except Exception as e:
             raise RuntimeError(f"生成操作描述失败: {str(e)}") from e
@@ -388,14 +411,14 @@ class LLMClient:
                 {"role": "user", "content": build_error_feedback_message(previous_errors)}
             ]
             try:
-                for delta, full_content in self._call_llm_stream(system_prompt, messages=messages):
+                for delta, full_content in self._call_llm_stream("generate", system_prompt, messages=messages):
                     yield delta, full_content
             except Exception as e:
                 raise RuntimeError(f"生成操作描述失败: {str(e)}") from e
         else:
             # 首次生成：单条用户消息
             try:
-                for delta, full_content in self._call_llm_stream(system_prompt, user_message=initial_message):
+                for delta, full_content in self._call_llm_stream("generate", system_prompt, user_message=initial_message):
                     yield delta, full_content
             except Exception as e:
                 raise RuntimeError(f"生成操作描述失败: {str(e)}") from e
@@ -426,7 +449,7 @@ class LLMClient:
         user_message = f"原始需求：{user_requirement}\n\n请根据上面的需求分析结果，生成 JSON 格式的操作描述。"
 
         try:
-            async for item in self._call_llm_stream_async(system_prompt, user_message):
+            async for item in self._call_llm_stream_async("generate", system_prompt, user_message):
                 yield item
             # 注意：调用方需要在最后对 full_content 调用 _clean_json_response
         except Exception as e:
@@ -511,6 +534,6 @@ class LLMClient:
         return content.strip()
 
 
-def create_llm_client() -> LLMClient:
+def create_llm_client(stage_configs: Dict[str, LLMStageConfig]) -> LLMClient:
     """创建 LLM 客户端的工厂函数"""
-    return LLMClient()
+    return LLMClient(stage_configs=stage_configs)

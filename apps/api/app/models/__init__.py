@@ -6,6 +6,7 @@ from app.models.auth import RefreshToken
 from app.models.file import File
 from app.models.thread import Thread, ThreadTurn, TurnFile
 from app.models.btrack import BTrack
+from app.models.llm import LLMProvider, LLMModel, LLMCredential, LLMStageRoute, LLMStatus
 
 __all__ = [
     "User",
@@ -20,4 +21,9 @@ __all__ = [
     "ThreadTurn",
     "TurnFile",
     "BTrack",
+    "LLMProvider",
+    "LLMModel",
+    "LLMCredential",
+    "LLMStageRoute",
+    "LLMStatus",
 ]

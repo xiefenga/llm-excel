@@ -258,7 +258,7 @@ async def stream_excel_processing(
         return
 
     # === 2. generate/validate/execute ===
-    llm_client = get_llm_client()
+    llm_client = await get_llm_client()
     processor = ExcelProcessor(llm_client)
     config = ProcessConfig(stream_llm=stream_llm)
 

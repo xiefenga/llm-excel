@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.engine.llm_client import LLMClient
+from app.services.llm_config import load_stage_configs, LLMConfigError
+from app.core.database import AsyncSessionLocal
 from app.core.database import get_db
 from app.core.jwt import verify_token, create_access_token
 from app.core.config import settings
@@ -25,10 +27,17 @@ from app.models.role import Permission
 security = HTTPBearer(auto_error=False)
 
 
-def get_llm_client() -> LLMClient:
-    """获取 LLM 客户端"""
+async def get_llm_client(db: Optional[AsyncSession] = None) -> LLMClient:
+    """获取 LLM 客户端（从数据库加载配置）"""
     try:
-        return LLMClient()
+        if db is None:
+            async with AsyncSessionLocal() as session:
+                stage_configs = await load_stage_configs(session)
+        else:
+            stage_configs = await load_stage_configs(db)
+        return LLMClient(stage_configs=stage_configs)
+    except LLMConfigError as e:
+        raise HTTPException(status_code=500, detail=f"LLM 配置错误: {e}")
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"LLM 初始化失败: {e}")
 
@@ -325,4 +334,3 @@ async def has_permission(
         return len(matched_permissions) >= len(required_permissions)
     else:
         return len(matched_permissions) > 0
-

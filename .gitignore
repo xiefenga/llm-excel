@@ -12,4 +12,4 @@ docker/minio_data/*
 !docker/minio_data/README.md
 !docker/minio_data/.gitkeep
 !docker/minio_data/default_avatar.png
-!docker/minio_data/admin_avatar.svg
+!docker/minio_data/admin_avatar.svg.idea/

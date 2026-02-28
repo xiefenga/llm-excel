@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bug, Loader2, RefreshCw, Download } from "lucide-react";
+import { ArrowLeft, Loader2, Download } from "lucide-react";
+import { Link } from "react-router";
 
 import { getBTracks, exportBTracks } from "~/lib/api";
-import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -61,49 +61,39 @@ const BTrackPage = () => {
   };
 
   return (
-    <div className="h-full overflow-hidden">
-      <div className="h-full overflow-y-auto">
-        <div className="flex w-full flex-col gap-6 px-4 py-6 lg:px-8">
-          <section className="p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600">
-                  <Bug className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-slate-900">
-                    执行错误记录
-                  </h1>
-                  <p className="text-xs text-slate-500">
-                    当前系统执行过程中产生的 errors 列表
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {canExport && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExport}
-                    disabled={isExporting || isLoading}
-                    className="gap-2"
-                  >
-                    {isExporting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        导出中...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4" />
-                        导出 JSON
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </section>
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 border-b px-4 py-3">
+        <Button asChild size="icon-sm" variant="ghost">
+          <Link to="/admin">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <h1 className="flex-1 text-base font-semibold">异常追踪</h1>
+        {canExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting || isLoading}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                导出中...
+              </>
+            ) : (
+              <>
+                <Download className="h-3.5 w-3.5" />
+                导出
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex w-full flex-col gap-4 px-4 py-4 lg:px-6">
 
           <section className="grid gap-4">
             {isLoading && (

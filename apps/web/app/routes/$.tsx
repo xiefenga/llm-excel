@@ -53,7 +53,7 @@ const sizeMap = {
   lg: "px-4 py-2.5 text-sm",
 } as const;
 
-function FloatingCells() {
+const FloatingCells = () => {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {CELL_FRAGMENTS.map((cell, i) => {
@@ -77,13 +77,13 @@ function FloatingCells() {
       })}
     </div>
   );
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Scattered grid lines (Excel vibe)                                  */
 /* ------------------------------------------------------------------ */
 
-function GridBackground() {
+const GridBackground = () => {
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {/* Fine grid */}
@@ -102,13 +102,13 @@ function GridBackground() {
       <div className="absolute inset-0 bg-linear-to-r from-background via-transparent to-background" />
     </div>
   );
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Glowing orbs                                                       */
 /* ------------------------------------------------------------------ */
 
-function GlowOrbs() {
+const GlowOrbs = () => {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       <div
@@ -130,13 +130,13 @@ function GlowOrbs() {
       />
     </div>
   );
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Main 404 visual — the big number                                   */
 /* ------------------------------------------------------------------ */
 
-function Big404() {
+const Big404 = () => {
   return (
     <div className="relative select-none" aria-hidden>
       {/* Shadow layer */}
@@ -159,13 +159,13 @@ function Big404() {
       </div>
     </div>
   );
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Broken cell illustration                                           */
 /* ------------------------------------------------------------------ */
 
-function BrokenCellIllustration() {
+const BrokenCellIllustration = () => {
   const cells = useMemo(
     () => [
       { w: 72, h: 28, x: 0, y: 0, text: "ID", header: true },
@@ -237,7 +237,7 @@ function BrokenCellIllustration() {
       />
     </svg>
   );
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */

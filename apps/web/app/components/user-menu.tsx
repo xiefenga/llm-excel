@@ -1,3 +1,4 @@
+import { useState } from "react";
 import NiceModal from '@ebay/nice-modal-react';
 import { Link, useNavigate } from "react-router";
 import { LogOut, MessageCircle, Settings, User } from "lucide-react";
@@ -12,6 +13,7 @@ import invariant from 'tiny-invariant';
 export const UserMenu = () => {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
+  const [open, setOpen] = useState(false);
 
   // 权限检查 - 是否显示管理入口
   const isAdmin = useRole("admin");
@@ -22,6 +24,7 @@ export const UserMenu = () => {
   invariant(user)
 
   const handleLogout = async () => {
+    setOpen(false);
     try {
       await logout();
     } finally {
@@ -31,7 +34,7 @@ export const UserMenu = () => {
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -83,74 +86,36 @@ export const UserMenu = () => {
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
-            onClick={() => NiceModal.show(UserProfileDialog)}
+            onClick={() => {
+              setOpen(false);
+              NiceModal.show(UserProfileDialog);
+            }}
           >
             <User className="h-4 w-4 text-brand" />
             <span>个人信息</span>
           </button>
 
           {showAdminLink && (
-            <Link to="/admin">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
-              >
-                <Settings className="h-4 w-4 text-brand" />
-                <span>系统管理</span>
-              </button>
+            <Link
+              to="/admin"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
+            >
+              <Settings className="h-4 w-4 text-brand" />
+              <span>系统管理</span>
             </Link>
           )}
 
-
-
-
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-brand-muted cursor-pointer"
+            onClick={() => setOpen(false)}
           >
             <MessageCircle className="h-4 w-4 text-brand" />
             <span>反馈</span>
           </button>
-
-
         </div>
 
-        {/* 偏好设置 */}
-        {/* <div className="border-y border-emerald-50 px-4 py-2.5">
-          <p className="mb-2 text-sm font-medium text-gray-500">
-            偏好设置
-          </p>
-
-          <div className="space-y-2 text-sm text-gray-700">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5">
-                <SunMedium className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Theme</span>
-              </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                System
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5">
-                <Languages className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Language</span>
-              </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                Auto
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5">
-                <LayoutPanelLeft className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Chat Position</span>
-              </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                Left
-              </span>
-            </div>
-          </div>
-        </div> */}
         <div className="border-t p-1">
           {/* 登出 */}
           <button
@@ -164,10 +129,7 @@ export const UserMenu = () => {
             </span>
           </button>
         </div>
-
-
       </PopoverContent>
-    </Popover >
+    </Popover>
   );
 };
-

@@ -14,16 +14,16 @@ services:
     container_name: selgetabel-dev-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: llmexcel
-      POSTGRES_PASSWORD: llmexcel
-      POSTGRES_DB: llmexcel
+      POSTGRES_USER: llm-excel
+      POSTGRES_PASSWORD: llm-excel
+      POSTGRES_DB: llm-excel
     ports:
       - "5432:5432"
     volumes:
-      - selgetabel_postgres_dev_data:/var/lib/postgresql/data
+      - selgetabel_postgres_dev_data:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U llmexcel -d llmexcel"]
+      test: ["CMD-SHELL", "pg_isready -U llm-excel -d llm-excel"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,8 +33,8 @@ services:
     container_name: selgetabel-dev-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: llm-excel
+      MINIO_ROOT_PASSWORD: llm-excel
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -50,4 +50,6 @@ services:
 
 volumes:
   selgetabel_postgres_dev_data:
+    external: true
   selgetabel_minio_dev_data:
+    external: true

@@ -3,7 +3,8 @@
  * 管理用户信息、角色和权限
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { getUserInfo } from "~/lib/api";
 
 export interface UserInfo {
@@ -35,7 +36,7 @@ interface UserProviderProps {
   children: ReactNode;
 }
 
-export function UserProvider({ children }: UserProviderProps) {
+export const UserProvider = ({ children }: UserProviderProps) => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -127,37 +128,36 @@ export function UserProvider({ children }: UserProviderProps) {
       {children}
     </UserContext.Provider>
   );
-}
+};
 
 /**
  * 使用用户上下文
  */
-export function useUser() {
+export const useUser = () => {
   const context = useContext(UserContext);
   if (context === undefined) {
     throw new Error("useUser must be used within a UserProvider");
   }
   return context;
-}
-
+};
 /**
  * 权限守卫 Hook
  */
-export function usePermission(permission: string | string[], matchAll: boolean = false): boolean {
+export const usePermission = (permission: string | string[], matchAll: boolean = false): boolean => {
   const { hasPermission } = useUser();
   return hasPermission(permission, matchAll);
-}
+};
 
 /**
  * 角色守卫 Hook
  */
-export function useRole(role: string | string[]): boolean {
+export const useRole = (role: string | string[]): boolean => {
   const { hasRole } = useUser();
   return hasRole(role);
-}
+};
 
 // 辅助函数
-function matchPermissionPattern(pattern: string[], target: string[]): boolean {
+const matchPermissionPattern = (pattern: string[], target: string[]): boolean => {
   if (pattern.length !== target.length) {
     return false;
   }
@@ -169,4 +169,4 @@ function matchPermissionPattern(pattern: string[], target: string[]): boolean {
   }
 
   return true;
-}
+};

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.core.config import settings
-from app.api.routes import chat, auth, file, thread, btrack, role, user
+from app.api.routes import chat, auth, file, thread, btrack, role, user, llm
 
 api_router = APIRouter()
 
@@ -19,10 +19,11 @@ api_router.include_router(role.router)
 
 api_router.include_router(user.router)
 
+api_router.include_router(llm.router)
+
 # 只在开发环境启用 fixture 路由
 if settings.ENV == "development":
     from app.api.routes import fixture
 
     api_router.include_router(fixture.router)
-
 
