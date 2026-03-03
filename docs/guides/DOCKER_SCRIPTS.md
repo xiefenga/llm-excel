@@ -279,11 +279,7 @@ pnpm docker:init-data
 
 ---
 
-## 📚 相关文档
+## 相关文档
 
-- [README.md](README.md) - 项目概览
-- [QUICKSTART.md](QUICKSTART.md) - 快速开始
-- [docker/README.md](docker/README.md) - Docker 详细文档
-- [docker/scripts/README.md](docker/scripts/README.md) - 脚本文档
-- [DEPLOYMENT_FINAL.md](DEPLOYMENT_FINAL.md) - 部署方案
-- [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md) - 优化总结
+- [../../README.md](../../README.md) - 项目概览
+- [../../docker/README.md](../../docker/README.md) - Docker 详细文档

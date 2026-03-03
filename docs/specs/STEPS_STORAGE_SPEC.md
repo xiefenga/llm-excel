@@ -97,18 +97,18 @@
 }
 ```
 
-错误码参见 `SSE_SPEC.md`。
+错误码参见 [SSE_SPEC.md](./SSE_SPEC.md)。
 
 ## 三、状态流转
 
-### 3.1 单步骤生命周期
+### 单步骤生命周期
 
 ```
 running → done    (成功)
 running → error   (失败)
 ```
 
-### 3.2 重试场景
+### 重试场景
 
 同一步骤可出现多次，按执行顺序追加：
 
@@ -129,69 +129,8 @@ running → error   (失败)
 | `{ "step": "X", "status": "done", "output": {...} }` | 更新最后一条 X 记录：`status="done"`, 添加 `output`, `completed_at` |
 | `{ "step": "X", "status": "error", "error": {...} }` | 更新最后一条 X 记录：`status="error"`, 添加 `error`, `completed_at` |
 
-注意：`streaming` 状态不持久化，仅用于实时传输增量内容。
+`streaming` 状态不持久化，仅用于实时传输增量内容。
 
-## 五、前端回填逻辑
+## 五、前端回填
 
-### 5.1 获取每个步骤的最终状态
-
-```typescript
-function getLatestSteps(steps: StepRecord[]): Record<string, StepRecord> {
-  return steps.reduce(
-    (acc, step) => {
-      acc[step.step] = step; // 后来的覆盖先前的
-      return acc;
-    },
-    {} as Record<string, StepRecord>
-  );
-}
-
-// 使用
-const latest = getLatestSteps(turn.steps);
-if (latest.load?.status === "done") {
-  setFiles(latest.load.output.files);
-}
-if (latest.generate?.status === "done") {
-  setOperations(latest.generate.output.operations);
-}
-```
-
-### 5.2 展示重试历史（可选）
-
-```typescript
-const generateAttempts = steps.filter((s) => s.step === "generate");
-// 可展示 "尝试了 N 次"
-```
-
-## 六、数据库模型变更
-
-### 6.1 简化后的 ThreadTurn
-
-```python
-class ThreadTurn(Base):
-    __tablename__ = "thread_turns"
-
-    id: Mapped[UUID]
-    thread_id: Mapped[UUID]
-    turn_number: Mapped[int]
-
-    user_query: Mapped[str]           # 用户输入
-    status: Mapped[str]               # pending | processing | completed | failed
-    steps: Mapped[list]               # JSONB - 步骤数组（核心字段）
-
-    created_at: Mapped[datetime]
-    started_at: Mapped[Optional[datetime]]
-    completed_at: Mapped[Optional[datetime]]
-```
-
-### 6.2 删除的内容
-
-- **TurnResult 表**：合并到 `steps[execute].output`
-- **ThreadTurn.operations_json**：移入 `steps[generate].output.operations`
-- **ThreadTurn.error_message**：移入 `steps[].error.message`
-
-## 七、版本历史
-
-| 版本 | 日期       | 变更     |
-| ---- | ---------- | -------- |
-| 1.0  | 2025-01-28 | 初始版本 |
+加载历史消息时，遍历 `steps` 数组，同一 `step` 取最后一条作为最终状态。可选展示重试次数。

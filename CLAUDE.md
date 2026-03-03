@@ -46,7 +46,11 @@ llm-excel/
 ├── apps/
 │   ├── api/          # Python FastAPI backend
 │   └── web/          # React Router v7 frontend
-├── docs/             # Technical specifications
+├── docs/             # Technical documentation
+│   ├── design/       # System design & architecture
+│   ├── specs/        # Protocol & format specifications
+│   ├── conventions/  # Coding standards & workflows
+│   └── guides/       # How-to guides & references
 ├── package.json      # Root workspace config
 ├── pnpm-workspace.yaml
 └── turbo.json        # Turborepo task orchestration
@@ -171,7 +175,7 @@ The `/excel/chat` endpoint streams Server-Sent Events:
 - `apps/web/vite.config.ts` - Vite config with API proxy
 
 **Documentation:**
-- `docs/OPERATION_SPEC.md` - Complete operation specification
+- `docs/specs/OPERATION_SPEC.md` - Complete operation specification
 - `README.md` - Project overview and setup
 - `apps/api/README.md` - Backend API documentation
 
@@ -248,7 +252,7 @@ See `docker/README.md` for detailed deployment guide.
 ## Common Workflows
 
 **Adding a new operation type:**
-1. Define operation schema in `docs/OPERATION_SPEC.md`
+1. Define operation schema in `docs/specs/OPERATION_SPEC.md`
 2. Add validation in `apps/api/app/lib/parser.py`
 3. Implement execution in `apps/api/app/lib/executor.py`
 4. Add formula generation in `apps/api/app/lib/excel_generator.py`
@@ -258,7 +262,7 @@ See `docker/README.md` for detailed deployment guide.
 1. Add to function whitelist in `parser.py`
 2. Implement in `functions.py`
 3. Add formula template in `excel_generator.py`
-4. Update `docs/OPERATION_SPEC.md`
+4. Update `docs/specs/OPERATION_SPEC.md`
 
 **Modifying frontend routes:**
 - Routes are file-based in `apps/web/app/routes/`
