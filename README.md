@@ -1,64 +1,199 @@
-# Selgetabel 数据处理系统
+# Selgetabel
 
-用自然语言描述 Excel 数据处理需求，由后端调用大模型生成可执行的结构化操作，并返回预览、公式与导出的 Excel 文件。
+[中文文档](README.zh-CN.md)
 
-## 项目结构
+LLM-powered Excel data processing. Describe what you need in natural language — get structured operations, formulas, and downloadable Excel files.
 
-```
-Selgetabel/
-├── apps/
-│   ├── api/                    # Python FastAPI 后端（SSE）
-│   │   ├── app/
-│   │   │   ├── main.py          # FastAPI 入口：app.main:app
-│   │   │   ├── api/             # 路由（/excel/*）
-│   │   │   ├── lib/             # JSON 解析/执行/公式生成等
-│   │   │   └── services/        # Excel 读写与文件管理
-│   │   └── pyproject.toml       # Python 依赖（uv）
-│   └── web/                     # 前端（React Router v7 + Vite）
-│       ├── app/                 # UI 与页面
-│       └── vite.config.ts       # /api -> 后端代理
-├── package.json                 # monorepo 脚本入口
-├── pnpm-workspace.yaml          # pnpm workspace
-└── turbo.json                   # turborepo 任务编排
-```
+## How It Works
 
-## 部署与运行（Docker Compose）
+1. Upload Excel file(s)
+2. Describe your data processing requirement in natural language
+3. LLM generates structured JSON operations (not raw formulas)
+4. Engine executes operations and produces Excel files with real formulas
 
-```bash
-# 在你想要部署的目录下执行
-curl -fsSL https://raw.githubusercontent.com/xiefenga/selgetabel/main/install.sh | bash
-```
+All formulas are 100% reproducible — no LLM-generated code is executed directly.
 
-脚本会自动：
+## Tech Stack
 
-1. 下载 `docker` 目录中的部署文件到**当前目录**
-2. 从 `.env.example` 创建 `.env` 配置文件
-3. 显示详细的后续配置步骤
+| Layer | Technology |
+|-------|------------|
+| Frontend | React Router v7, Vite, TypeScript, Tailwind CSS |
+| Backend | Python FastAPI, multi-provider LLM support |
+| Storage | PostgreSQL, MinIO (S3-compatible) |
+| Infra | pnpm workspace, Turborepo, Docker Compose |
 
-完成后，按照提示：
+## Quick Start (Docker)
+
+### Prerequisites
+
+- Docker & Docker Compose
+
+### Deploy
 
 ```bash
-# 1. 配置环境变量（注意：所有文件都在当前目录）
-vi .env
+# Clone and enter the project
+git clone https://github.com/xiefenga/selgetabel.git
+cd selgetabel/docker
 
-# 必须修改的配置：
-# - OPENAI_API_KEY=xxx                  # OpenAI API 密钥
-# - POSTGRES_PASSWORD=strong_password   # 数据库密码
-# - MINIO_ROOT_PASSWORD=strong_password # MinIO 密码
-# - JWT_SECRET_KEY=xxx                  # 使用 openssl rand -hex 32 生成
+# Create environment config
+cp .env.example .env
+```
 
-# 2. 启动服务
+Edit `.env` and configure the required variables:
+
+```bash
+# Required
+POSTGRES_PASSWORD=strong_password   # Database password
+MINIO_ROOT_PASSWORD=strong_password # Object storage password
+JWT_SECRET_KEY=xxx                  # Run: openssl rand -hex 32
+```
+
+Start the services:
+
+```bash
 docker compose up -d
 
-# 3. 访问应用
-# http://localhost:8080
+# Access the app at http://localhost:8080
 ```
 
----
+After startup, configure LLM providers through the admin panel (Settings > LLM Providers). See [LLM Providers](#llm-providers) for details.
 
-## 相关文档
+### Upgrade
 
-- **版本管理**: [VERSION.md](VERSION.md) - 版本号规则和发布流程
-- **环境变量**: [ENV.md](ENV.md) - 环境变量配置说明
-- **后端 API**: [apps/api/README.md](apps/api/README.md) - 后端 API 详细文档
-- **操作规范**: [docs/OPERATION_SPEC.md](docs/OPERATION_SPEC.md) - JSON 操作规范说明
+```bash
+cd docker
+./scripts/upgrade.sh <version>
+```
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 22+ / pnpm 10+
+- Python 3.11+
+- PostgreSQL & MinIO (or use `docker compose -f docker/docker-compose.dev.yml up -d`)
+
+### Setup
+
+```bash
+# Install frontend dependencies
+pnpm install
+
+# Install backend dependencies
+pnpm --filter @selgetabel/api install
+
+# Start all services
+pnpm dev
+```
+
+| Service | URL |
+|---------|-----|
+| Web | http://localhost:5173 |
+| API | http://localhost:8000 |
+| API Docs | http://localhost:8000/docs |
+
+### Commands
+
+```bash
+pnpm dev          # Start web + API
+pnpm dev:api      # Start API only
+pnpm build        # Build all packages
+pnpm format       # Format code (Prettier)
+pnpm check-types  # Type checking
+```
+
+## Architecture
+
+```
+selgetabel/
+├── apps/
+│   ├── api/           # Python FastAPI backend
+│   │   ├── app/
+│   │   │   ├── main.py        # App entry point
+│   │   │   ├── api/routes/    # Route handlers
+│   │   │   ├── engine/        # Core: parser, executor, formula gen, LLM prompts
+│   │   │   ├── processor/     # Processing pipeline
+│   │   │   ├── services/      # Business logic, file I/O, auth
+│   │   │   ├── models/        # SQLAlchemy ORM
+│   │   │   └── core/          # Config, DB, JWT
+│   │   └── pyproject.toml
+│   └── web/           # React Router v7 frontend
+│       ├── app/
+│       │   ├── routes/        # File-based routing
+│       │   ├── components/    # Shared UI components
+│       │   ├── features/      # Feature modules
+│       │   └── lib/           # Utilities & API client
+│       └── vite.config.ts
+├── docker/            # Docker Compose deployment
+├── docs/              # Technical documentation
+│   ├── design/        # System design & architecture
+│   ├── specs/         # Protocol & format specifications
+│   ├── conventions/   # Coding standards & workflows
+│   └── guides/        # How-to guides
+├── package.json
+├── pnpm-workspace.yaml
+└── turbo.json
+```
+
+### LLM Providers
+
+The system supports multiple LLM providers with database-driven configuration. Providers, models, and credentials are managed via the admin API (`/llm/*`).
+
+**Supported providers:**
+
+| Provider | Type | Status |
+|----------|------|--------|
+| OpenAI | `openai` | Available |
+| OpenAI-compatible | `openai_compatible` | Available |
+| Anthropic | `anthropic` | Planned |
+| Azure OpenAI | `azure_openai` | Planned |
+| DeepSeek | `deepseek` | Planned |
+| Qwen | `qwen` | Planned |
+| Ollama | `ollama` | Planned |
+
+**Stage-level routing** — different pipeline stages (analyze, generate, title) can use different provider/model combinations.
+
+See [LLM Provider Design](docs/design/LLM_PROVIDER_DESIGN.md) for the full architecture.
+
+### Processing Pipeline
+
+The backend streams SSE events through a multi-stage pipeline:
+
+```
+Upload → Load → Generate (LLM) → Validate → Execute → Export
+```
+
+- **Generate**: LLM produces structured JSON operations from natural language
+- **Validate**: Parser checks format and applies function whitelist
+- **Execute**: Engine runs operations and generates Excel formulas
+- **Export**: Outputs downloadable `.xlsx` with embedded formulas
+
+### Supported Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `aggregate` | Column aggregation (SUM, AVERAGE, SUMIF, etc.) |
+| `add_column` | Add calculated column with formula |
+| `update_column` | Update existing column values |
+| `compute` | Scalar computation on variables |
+| `filter` | Filter rows by condition |
+| `sort` | Sort by column(s) |
+| `group_by` | Group and aggregate |
+| `take` | Limit row count |
+| `select_columns` | Select specific columns |
+| `drop_columns` | Remove columns |
+| `create_sheet` | Create new worksheet |
+
+## Documentation
+
+- [Operation Specification](docs/specs/OPERATION_SPEC.md) — JSON operation format
+- [SSE Protocol](docs/specs/SSE_SPEC.md) — Server-Sent Events protocol
+- [Steps Storage](docs/specs/STEPS_STORAGE_SPEC.md) — ThreadTurn steps format
+- [LLM Provider Design](docs/design/LLM_PROVIDER_DESIGN.md) — Multi-provider architecture
+- [Engine Architecture](docs/design/ENGINE_ARCHITECTURE.md) — Core engine design
+- [Database Design](docs/design/DATABASE_DESIGN.md) — Data model
+- [Docker Scripts](docs/guides/DOCKER_SCRIPTS.md) — Deployment scripts guide
+
+## License
+
+[Apache-2.0](LICENSE)

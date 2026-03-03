@@ -62,13 +62,16 @@ llm-excel/
 
 **Key Directories:**
 - `app/api/routes/` - API route handlers
-- `app/lib/` - Core logic: JSON parsing, execution engine, formula generation
-- `app/services/` - Excel file I/O and file management
+- `app/engine/` - Core logic: JSON parsing, execution engine, formula generation, LLM prompts
+- `app/processor/` - Processing pipeline and stages
+- `app/services/` - Business logic, file I/O, auth, MinIO integration
+- `app/models/` - SQLAlchemy ORM models
+- `app/core/` - Config, database, JWT, permissions
 
 **Core Flow:**
 1. User uploads Excel file(s) → returns `file_id` for each
-2. User sends natural language query + `file_ids` via `/excel/chat`
-3. Backend streams SSE events: `load` → `analysis` → `generate` → `execute` → `complete`
+2. User sends natural language query + `file_ids` via `POST /chat`
+3. Backend streams SSE events: `load` → `generate` → `validate` → `execute` → `export`
 4. LLM generates structured JSON operations (not raw formulas)
 5. Executor parses JSON, executes operations, generates Excel formulas
 6. Returns preview data + downloadable Excel file with formulas
@@ -78,7 +81,8 @@ llm-excel/
 - `add_column` - Add calculated column with formula
 - `update_column` - Update existing column (e.g., fill nulls)
 - `compute` - Scalar computation on variables
-- `filter`, `sort`, `group_by`, `take` - Excel 365+ dynamic array operations
+- `filter`, `sort`, `group_by`, `take`, `select_columns`, `drop_columns` - Excel 365+ dynamic array operations
+- `create_sheet` - Create new worksheet (internal abstraction)
 
 **Formula Expression Format:**
 All formulas use JSON objects (not strings) to avoid parsing ambiguity:
@@ -90,10 +94,11 @@ All formulas use JSON objects (not strings) to avoid parsing ambiguity:
 }
 ```
 
-**Environment Variables:**
-- `OPENAI_API_KEY` (required)
-- `OPENAI_BASE_URL` (optional)
-- `OPENAI_MODEL` (optional)
+**Environment Variables (local dev):**
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET_KEY` - JWT signing key
+- `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` - MinIO config
+- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` - LLM fallback config (can also configure via `/llm` API)
 
 **File Storage:**
 - Files stored in MinIO object storage
@@ -123,7 +128,7 @@ All formulas use JSON objects (not strings) to avoid parsing ambiguity:
 
 ## Key Technical Concepts
 
-### Two-Phase LLM Processing
+### LLM Processing Pipeline
 
 The system uses a single-step LLM flow:
 1. LLM receives user requirement + table structure
@@ -152,22 +157,23 @@ The executor generates Excel formulas from JSON operations:
 
 ### SSE Event Stream
 
-The `/excel/chat` endpoint streams Server-Sent Events:
-- `load` - File loading progress
-- `analysis` - Requirement analysis (if two-step flow)
-- `generate` - Operation generation
-- `execute` - Execution progress
-- `complete` - Final result with output file path
+`POST /chat` streams Server-Sent Events through the processing pipeline:
+- `load` - File loading
+- `generate` - LLM operation generation
+- `validate` - JSON validation
+- `execute` - Operation execution + formula generation
+- `export` - Output file creation
 
 ## Important Files
 
 **Backend:**
-- `apps/api/app/api/main.py` - FastAPI app entry
-- `apps/api/app/lib/executor.py` - Execution engine + JSON expression evaluator
-- `apps/api/app/lib/parser.py` - JSON parser + validation
-- `apps/api/app/lib/functions.py` - Function implementations
-- `apps/api/app/lib/excel_generator.py` - Excel formula generation
-- `apps/api/app/services/excel_service.py` - Excel file I/O
+- `apps/api/app/main.py` - FastAPI app entry
+- `apps/api/app/engine/executor.py` - Execution engine + JSON expression evaluator
+- `apps/api/app/engine/parser.py` - JSON parser + validation
+- `apps/api/app/engine/functions.py` - Function implementations
+- `apps/api/app/engine/excel_generator.py` - Excel formula generation
+- `apps/api/app/engine/prompt.py` - LLM prompt templates
+- `apps/api/app/processor/excel_processor.py` - Processing pipeline orchestrator
 
 **Frontend:**
 - `apps/web/app/routes/_auth._app._index.tsx` - Main chat interface
@@ -176,8 +182,9 @@ The `/excel/chat` endpoint streams Server-Sent Events:
 
 **Documentation:**
 - `docs/specs/OPERATION_SPEC.md` - Complete operation specification
+- `docs/specs/SSE_SPEC.md` - SSE event protocol
+- `docs/specs/STEPS_STORAGE_SPEC.md` - ThreadTurn steps storage format
 - `README.md` - Project overview and setup
-- `apps/api/README.md` - Backend API documentation
 
 ## Docker Deployment
 
@@ -253,15 +260,15 @@ See `docker/README.md` for detailed deployment guide.
 
 **Adding a new operation type:**
 1. Define operation schema in `docs/specs/OPERATION_SPEC.md`
-2. Add validation in `apps/api/app/lib/parser.py`
-3. Implement execution in `apps/api/app/lib/executor.py`
-4. Add formula generation in `apps/api/app/lib/excel_generator.py`
-5. Update LLM prompt in `apps/api/app/lib/prompt.py`
+2. Add validation in `apps/api/app/engine/parser.py`
+3. Implement execution in `apps/api/app/engine/executor.py`
+4. Add formula generation in `apps/api/app/engine/excel_generator.py`
+5. Update LLM prompt in `apps/api/app/engine/prompt.py`
 
 **Adding a new function:**
-1. Add to function whitelist in `parser.py`
-2. Implement in `functions.py`
-3. Add formula template in `excel_generator.py`
+1. Add to function whitelist in `engine/parser.py`
+2. Implement in `engine/functions.py`
+3. Add formula template in `engine/excel_generator.py`
 4. Update `docs/specs/OPERATION_SPEC.md`
 
 **Modifying frontend routes:**

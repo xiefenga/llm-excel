@@ -64,7 +64,7 @@ SSE streaming uses `fetch-event-stream` for real-time processing events.
 
 ## Component Conventions
 
-See [docs/COMPONENT_CONVENTIONS.md](../../docs/COMPONENT_CONVENTIONS.md) for full rules:
+See [COMPONENT_CONVENTIONS.md](../../docs/conventions/COMPONENT_CONVENTIONS.md) for full rules:
 
 - Define components with `const` + arrow function (no `function` declarations)
 - Named export → `export const Xxx = ...`
