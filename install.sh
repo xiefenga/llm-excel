@@ -9,9 +9,13 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
+# REPO_OWNER="xiefenga"
+# REPO_NAME="selgetabel"
+# BRANCH="main"
 REPO_OWNER="xiefenga"
 REPO_NAME="selgetabel"
 BRANCH="main"
+
 TARGET_DIR="docker"
 EXCLUDED_FILES=("scripts" "docker-compose.build.yml" "docker-compose.dev.yml")
 
