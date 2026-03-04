@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 # REPO_OWNER="xiefenga"
 # REPO_NAME="selgetabel"
 # BRANCH="main"
-REPO_OWNER="xiefenga"
+REPO_OWNER="JAYDEN-LIAO" 
 REPO_NAME="selgetabel"
 BRANCH="main"
 
