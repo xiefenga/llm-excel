@@ -1,6 +1,7 @@
 services:
   api:
     image: 0x1461a0/selgetabel-api:${IMAGE_VERSION:-latest}
+    entrypoint: [] # <--- 新增这一行，强制忽略镜像内错误的入口点
     restart: unless-stopped
     env_file: .env
     environment:
