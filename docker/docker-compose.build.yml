@@ -1,14 +1,3 @@
-# 本地构建 Docker Compose 配置
-# 用于测试和本地构建镜像
-#
-# 配置环境变量：
-#   cd docker
-#   cp .env.example .env
-#   nano .env  # 修改配置
-#
-# 使用：
-#   docker compose -f docker-compose.build.yml up --build -d
-
 services:
   # 数据库迁移容器（临时，只运行一次）
   init-db:
@@ -137,7 +126,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llmexcel} -d ${POSTGRES_DB:-llmexcel}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-llmexcel} -d ${POSTGRES_DB:-llmexcel}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
