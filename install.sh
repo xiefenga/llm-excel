@@ -138,7 +138,7 @@ initialize() {
 
     # Step 4: Run database migrations
     print_info "Running database migrations..."
-    docker compose run --rm api /app/.venv/bin/alembic upgrade head
+    docker compose run --rm api uv run alembic upgrade head
     print_success "Database migrations completed."
 
     # Step 5: Execute SQL init data files
