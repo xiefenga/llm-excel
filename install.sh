@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_OWNER="JAYDEN-LIAO" 
+REPO_OWNER="xiefenga"
 REPO_NAME="selgetabel"
 BRANCH="main"
 
