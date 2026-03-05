@@ -12,6 +12,7 @@ NC='\033[0m' # No Color
 REPO_OWNER="xiefenga"
 REPO_NAME="selgetabel"
 BRANCH="main"
+
 TARGET_DIR="docker"
 EXCLUDED_FILES=("scripts" "docker-compose.build.yml" "docker-compose.dev.yml")
 
@@ -82,16 +83,22 @@ load_env_var() {
 }
 
 # Wait for a service to become healthy
+# [MODIFIED]: Increased timeout from 60s to 180s (90 attempts * 2s) to handle slow Windows disk I/O
 wait_for_service() {
     local service_name="$1"
     local check_cmd="$2"
-    local max_attempts=30
+    local max_attempts=90  # Changed from 30 to 90 (3 minutes total)
     local interval=2
     local attempt=1
 
-    print_info "Waiting for ${service_name} to be ready..."
+    print_info "Waiting for ${service_name} to be ready... (Timeout: $((max_attempts * interval))s)"
 
     while [ $attempt -le $max_attempts ]; do
+        # Show progress every 10 attempts
+        if [ $((attempt % 10)) -eq 0 ]; then
+            print_info "Still waiting for ${service_name}... (Attempt ${attempt}/${max_attempts})"
+        fi
+
         if eval "$check_cmd" >/dev/null 2>&1; then
             print_success "${service_name} is ready."
             return 0
@@ -101,6 +108,7 @@ wait_for_service() {
     done
 
     print_error "${service_name} did not become ready within $((max_attempts * interval)) seconds."
+    print_error "Please check logs: docker compose logs ${service_name}"
     exit 1
 }
 
@@ -124,6 +132,10 @@ initialize() {
     print_info "Starting PostgreSQL and MinIO..."
     docker compose up -d postgres minio
 
+    # [MODIFIED]: Add a small buffer to allow containers to actually start processes before checking
+    print_info "Allowing containers to initialize processes..."
+    sleep 5
+
     # Step 2: Wait for PostgreSQL
     wait_for_service "PostgreSQL" \
         "docker exec selgetabel-postgres pg_isready -U ${pg_user} -d ${pg_db}"
@@ -134,7 +146,11 @@ initialize() {
 
     # Step 4: Run database migrations
     print_info "Running database migrations..."
-    docker compose run --rm api /app/.venv/bin/alembic upgrade head
+    # [MODIFIED]: Added error handling for migration in case it fails partially
+    if ! docker compose run --rm api uv run alembic upgrade head; then
+        print_error "Database migrations failed. Check logs above."
+        exit 1
+    fi
     print_success "Database migrations completed."
 
     # Step 5: Execute SQL init data files
@@ -155,21 +171,52 @@ initialize() {
 
     # Step 6: Setup MinIO bucket and upload init data
     print_info "Setting up MinIO bucket..."
-    docker exec selgetabel-minio mc alias set local http://localhost:9000 "${minio_root_user}" "${minio_root_password}"
+    # 设置 alias (忽略错误，如果已存在)
+    docker exec selgetabel-minio mc alias set local http://localhost:9000 "${minio_root_user}" "${minio_root_password}" || true
     docker exec selgetabel-minio mc mb "local/${minio_bucket}" --ignore-existing
     docker exec selgetabel-minio mc anonymous set public "local/${minio_bucket}"
     print_success "MinIO bucket configured."
 
+    # 检查 init_data 目录是否存在且有文件
     if [ -d "./minio/init_data" ] && [ "$(ls -A ./minio/init_data 2>/dev/null)" ]; then
         print_info "Uploading MinIO init data..."
-        for file in ./minio/init_data/*; do
+        
+        # 获取当前脚本执行目录的绝对路径 (解决 Windows Git Bash 路径问题)
+        CURRENT_DIR_ABS=$(cd "./minio/init_data" && pwd)
+        
+        for file_path in "${CURRENT_DIR_ABS}"/*; do
+            # 跳过如果不是文件
+            if [ ! -f "$file_path" ]; then
+                continue
+            fi
+            
             local filename
-            filename=$(basename "$file")
+            filename=$(basename "$file_path")
+            
             print_info "Uploading: ${filename}"
-            docker cp "$file" "selgetabel-minio:/tmp/${filename}"
-            docker exec selgetabel-minio mc cp "/tmp/${filename}" "local/${minio_bucket}/__SYS__/${filename}"
+            
+            # 1. 拷贝到容器内部临时目录
+            if ! docker cp "$file_path" "selgetabel-minio:/tmp/${filename}"; then
+                print_error "Failed to copy ${filename} to container. Check path: $file_path"
+                continue
+            fi
+            
+            # 2. 在容器内部执行上传
+            if ! docker exec selgetabel-minio mc cp "/tmp/${filename}" "local/${minio_bucket}/__SYS__/${filename}"; then
+                print_error "Failed to upload ${filename} to MinIO."
+                docker exec selgetabel-minio rm -f "/tmp/${filename}"
+                continue
+            fi
+            
+            # 3. 清理容器内的临时文件
+            docker exec selgetabel-minio rm -f "/tmp/${filename}"
+            
+            print_success "Uploaded: ${filename}"
         done
+        
         print_success "MinIO init data uploaded."
+    else
+        print_info "No MinIO init data found in ./minio/init_data, skipping upload."
     fi
 
 }
@@ -204,11 +251,9 @@ download_docker_dir() {
 
     # Check if any files from docker directory already exist
     local has_conflicts=false
-    # Enable dotglob to match hidden files
     shopt -s dotglob
     for item in "${source_docker_dir}"/*; do
         local basename=$(basename "$item")
-        # Skip excluded files
         local is_excluded=false
         for excluded in "${EXCLUDED_FILES[@]}"; do
             if [ "$basename" = "$excluded" ]; then
@@ -241,12 +286,10 @@ download_docker_dir() {
 
     # Copy docker directory contents to current directory
     print_info "Copying files to current directory..."
-    # Enable dotglob to match hidden files
     shopt -s dotglob
     for item in "${source_docker_dir}"/*; do
         local basename=$(basename "$item")
 
-        # Skip excluded files
         local is_excluded=false
         for excluded in "${EXCLUDED_FILES[@]}"; do
             if [ "$basename" = "$excluded" ]; then
