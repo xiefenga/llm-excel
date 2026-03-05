@@ -157,23 +157,80 @@ initialize() {
         fi
     fi
 
-    # Step 6: Setup MinIO bucket and upload init data
+    # # Step 6: Setup MinIO bucket and upload init data
+    # print_info "Setting up MinIO bucket..."
+    # docker exec selgetabel-minio mc alias set local http://localhost:9000 "${minio_root_user}" "${minio_root_password}"
+    # docker exec selgetabel-minio mc mb "local/${minio_bucket}" --ignore-existing
+    # docker exec selgetabel-minio mc anonymous set public "local/${minio_bucket}"
+    # print_success "MinIO bucket configured."
+
+    # if [ -d "./minio/init_data" ] && [ "$(ls -A ./minio/init_data 2>/dev/null)" ]; then
+    #     print_info "Uploading MinIO init data..."
+    #     for file in ./minio/init_data/*; do
+    #         local filename
+    #         filename=$(basename "$file")
+    #         print_info "Uploading: ${filename}"
+    #         docker cp "$file" "selgetabel-minio:/tmp/${filename}"
+    #         docker exec selgetabel-minio mc cp "/tmp/${filename}" "local/${minio_bucket}/__SYS__/${filename}"
+    #     done
+    #     print_success "MinIO init data uploaded."
+    # fi
+        # Step 6: Setup MinIO bucket and upload init data
+
+        
     print_info "Setting up MinIO bucket..."
-    docker exec selgetabel-minio mc alias set local http://localhost:9000 "${minio_root_user}" "${minio_root_password}"
+    # 设置 alias (忽略错误，如果已存在)
+    docker exec selgetabel-minio mc alias set local http://localhost:9000 "${minio_root_user}" "${minio_root_password}" || true
     docker exec selgetabel-minio mc mb "local/${minio_bucket}" --ignore-existing
     docker exec selgetabel-minio mc anonymous set public "local/${minio_bucket}"
     print_success "MinIO bucket configured."
 
+    # 检查 init_data 目录是否存在且有文件
     if [ -d "./minio/init_data" ] && [ "$(ls -A ./minio/init_data 2>/dev/null)" ]; then
         print_info "Uploading MinIO init data..."
-        for file in ./minio/init_data/*; do
+        
+        # 获取当前脚本执行目录的绝对路径 (解决 Windows Git Bash 路径问题)
+        # pwd -W 会返回 Windows 路径 (C:/...)，pwd 返回 Unix 风格 (/c/...)
+        # Docker Desktop 通常更喜欢 Unix 风格 (/c/...) 或自动转换，但绝对路径最稳
+        CURRENT_DIR_ABS=$(cd "./minio/init_data" && pwd)
+        
+        for file_path in "${CURRENT_DIR_ABS}"/*; do
+            # 跳过如果不是文件
+            if [ ! -f "$file_path" ]; then
+                continue
+            fi
+            
             local filename
-            filename=$(basename "$file")
+            filename=$(basename "$file_path")
+            
             print_info "Uploading: ${filename}"
-            docker cp "$file" "selgetabel-minio:/tmp/${filename}"
-            docker exec selgetabel-minio mc cp "/tmp/${filename}" "local/${minio_bucket}/__SYS__/${filename}"
+            
+            # 1. 拷贝到容器内部临时目录
+            # 使用绝对路径 $file_path 确保 Docker 能找到宿主机文件
+            if ! docker cp "$file_path" "selgetabel-minio:/tmp/${filename}"; then
+                print_error "Failed to copy ${filename} to container. Check path: $file_path"
+                continue
+            fi
+            
+            # 2. 在容器内部执行上传
+            # 目标路径根据你的需求，这里保留了原逻辑中的 __SYS__ 目录
+            # 注意：如果不需要 __SYS__ 目录，可以去掉它
+            if ! docker exec selgetabel-minio mc cp "/tmp/${filename}" "local/${minio_bucket}/__SYS__/${filename}"; then
+                print_error "Failed to upload ${filename} to MinIO."
+                # 清理失败的文件
+                docker exec selgetabel-minio rm -f "/tmp/${filename}"
+                continue
+            fi
+            
+            # 3. 清理容器内的临时文件
+            docker exec selgetabel-minio rm -f "/tmp/${filename}"
+            
+            print_success "Uploaded: ${filename}"
         done
+        
         print_success "MinIO init data uploaded."
+    else
+        print_info "No MinIO init data found in ./minio/init_data, skipping upload."
     fi
 
 }
