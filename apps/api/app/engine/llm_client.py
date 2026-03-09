@@ -53,13 +53,17 @@ class LLMClient:
         messages: List[Dict[str, str]],
     ) -> LLMRequest:
         defaults = stage_config.model.defaults or {}
+        # 合并 extra_params，支持 provider 特定参数（如 endpoint_suffix）
+        extra_params = defaults.get("extra_params") or {}
+        if "endpoint_suffix" in defaults:
+            extra_params = {**extra_params, "endpoint_suffix": defaults["endpoint_suffix"]}
         return LLMRequest(
             model_id=stage_config.model.model_id,
             messages=messages,
             temperature=defaults.get("temperature", 0),
             max_tokens=defaults.get("max_tokens"),
             response_format=defaults.get("response_format"),
-            extra_params=defaults.get("extra_params") or {},
+            extra_params=extra_params,
         )
 
     def call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:

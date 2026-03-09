@@ -4,16 +4,17 @@ import { Plus, Search } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { LLMStatus } from "~/lib/llm-types";
+import type { LLMProvider } from "~/lib/llm-types";
 import { useModels } from "~/features/admin/llm/hooks";
 import { ModelItem } from "~/features/admin/llm/model-item";
 import { AddModelDialog } from "~/features/admin/llm/add-model-dialog";
 
 interface ProviderModelsProps {
-  providerId: string;
+  provider: LLMProvider;
 }
 
-export const ProviderModels = ({ providerId }: ProviderModelsProps) => {
-  const { data: models, isLoading } = useModels(providerId);
+export const ProviderModels = ({ provider }: ProviderModelsProps) => {
+  const { data: models, isLoading } = useModels(provider.id);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
 
@@ -88,7 +89,8 @@ export const ProviderModels = ({ providerId }: ProviderModelsProps) => {
       <AddModelDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        providerId={providerId}
+        providerId={provider.id}
+        providerType={provider.type}
       />
     </div>
   );
