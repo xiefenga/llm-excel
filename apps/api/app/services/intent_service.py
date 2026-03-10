@@ -58,45 +58,58 @@ class IntentService:
         """
         try:
             # =======================================================
-            # 💡 核心修复：如果当前没有传文件，尝试从历史对话中继承文件
+            # 💡 核心修复 1&2：继承历史文件 + 提取历史对话给分类器
             # =======================================================
-            if not file_ids and thread_id and db_session:
+            history_text = ""
+            if thread_id and db_session:
                 from sqlalchemy import select
                 from sqlalchemy.orm import selectinload
                 from app.models.thread import ThreadTurn
                 from uuid import UUID
                 
                 try:
-                    # 去数据库里找这个会话最近的几轮记录
                     stmt = (
                         select(ThreadTurn)
                         .where(ThreadTurn.thread_id == UUID(thread_id))
                         .order_by(ThreadTurn.turn_number.desc())
                         .options(selectinload(ThreadTurn.files))
-                        .limit(5)  # 往回找最近的 5 轮
+                        .limit(5)
                     )
                     result = await db_session.execute(stmt)
                     recent_turns = result.scalars().all()
                     
-                    # 找到最近一个带有文件的轮次，继承它的文件
-                    for turn in recent_turns:
-                        if turn.files:
-                            file_ids = [str(f.id) for f in turn.files]
-                            logger.info(f"🔄 从历史对话(turn={turn.turn_number})中自动继承了 {len(file_ids)} 个文件")
-                            break
+                    # 1. 继承文件 (只有当前没传文件时才继承)
+                    if not file_ids:
+                        for turn in recent_turns:
+                            if turn.files:
+                                file_ids = [str(f.id) for f in turn.files]
+                                logger.info(f"🔄 从历史对话(turn={turn.turn_number})中自动继承了 {len(file_ids)} 个文件")
+                                break
+                    
+                    # 2. 提取历史对话作为分类器的记忆
+                    if recent_turns:
+                        history_lines = []
+                        # 反转顺序，按时间正序拼接最近3轮
+                        for t in reversed(recent_turns[:3]):
+                            if t.user_query:
+                                history_lines.append(f"用户: {t.user_query}")
+                            if t.response_text:
+                                history_lines.append(f"助手: {t.response_text}")
+                        history_text = "\n".join(history_lines)
+                        
                 except Exception as db_e:
-                    logger.warning(f"尝试继承历史文件失败: {db_e}")
+                    logger.warning(f"尝试继承历史文件或获取历史对话失败: {db_e}")
             # =======================================================
 
-            # 检查是否有文件 (此时如果继承成功，has_files 就会变成 True!)
             has_files = len(file_ids) > 0
             file_count = len(file_ids)
             
-            # 调用分类器
+            # 调用分类器 (传入我们刚组装好的 history_text)
             classification_result = self.intent_classifier.classify(
                 query=query,
                 has_files=has_files,
-                file_count=file_count
+                file_count=file_count,
+                history=history_text  # 👈 新增传参
             )
             
             # 获取意图类型

@@ -129,7 +129,8 @@ class ChatService:
         query: str,
         user_id: UUID,
         thread_id: Optional[UUID] = None,
-        db_session: Optional[AsyncSessionLocal] = None
+        db_session: Optional[AsyncSessionLocal] = None,
+        file_ids: List[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         流式聊天（已接入富上下文系统）
@@ -183,7 +184,9 @@ class ChatService:
                 thread_id=thread.id,
                 query=query,
                 response=full_response,
-                db_session=db_session
+                db_session=db_session,
+                user_id=user_id,     # 👈 传进去
+                file_ids=file_ids    # 👈 传进去
             )
             
             # 💡 7. 顺手将这次对话的上下文拍个快照存进数据库，方便以后追溯
@@ -393,44 +396,31 @@ class ChatService:
         thread_id: UUID,
         query: str,
         response: str,
-        db_session: AsyncSessionLocal
+        db_session: AsyncSessionLocal,
+        user_id: Optional[UUID] = None,    # 👈 新增
+        file_ids: Optional[List[str]] = None  # 👈 新增
     ) -> Optional[ThreadTurn]:
-        """
-        保存对话轮次
-        
-        Args:
-            thread_id: 线程ID
-            query: 用户查询
-            response: AI回复
-            db_session: 数据库会话
-            
-        Returns:
-            保存的Turn对象
-        """
-        if db_session is None:
-            return None
-        
+        """保存对话轮次"""
+        if db_session is None: return None
         try:
             repo = TurnRepository(db_session)
-            
-            # 获取下一个轮次号
             turn_number = await repo.get_next_turn_number(thread_id)
-            
-            # 创建对话轮次
             turn = await repo.create_turn(
-                thread_id=thread_id,
-                turn_number=turn_number,
-                user_query=query,
-                intent_type="chat",  # 标记为聊天意图
-                response_text=response  # 保存AI回复
+                thread_id=thread_id, turn_number=turn_number,
+                user_query=query, intent_type="chat", response_text=response
             )
-
-            logger.info(f"聊天对话保存: thread={thread_id}, turn={turn.id}, "
-                       f"intent_type=chat, query='{query[:50]}...', response_length={len(response)}")
             
+            # 💡 核心修复 3：如果是带文件的澄清/聊天，把文件关联到轮次上！
+            if file_ids and user_id:
+                try:
+                    from uuid import UUID
+                    file_uuids = [UUID(fid) if isinstance(fid, str) else fid for fid in file_ids]
+                    await repo.link_files_to_turn(turn.id, file_uuids, user_id)
+                except Exception as e:
+                    logger.warning(f"聊天轮次关联文件失败: {e}")
+
             await repo.commit()
             return turn
-            
         except Exception as e:
             logger.error(f"保存对话记录失败: {e}", exc_info=True)
             return None

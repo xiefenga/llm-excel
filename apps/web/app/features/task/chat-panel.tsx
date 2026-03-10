@@ -155,22 +155,15 @@ const ChatPanel = ({
   const isEmptyConversation = turns.length === 0
 
   // 是否可以提交：
-  // - 空对话时：需要有文件且有内容
-  // - 有历史时：只需要有内容（可以基于历史文件继续）
+  // - 允许纯文本聊天，不强制要求文件
+  // - 如果有文件，可以处理文件；如果没有文件，可以进行纯文本对话
   const canSubmit = useMemo(() => {
     if (isProcessing || isUploading) return false
     if (!query.trim()) return false
-
-    // 空对话时需要上传文件
-    if (isEmptyConversation) {
-      return fileItems.some(f => f.status === 'success')
-    }
-
-    // 有历史时，有新文件或选中了历史文件都可以
-    const hasNewFiles = fileItems.some(f => f.status === 'success')
-    const hasSelectedHistory = selectedHistoryFiles.length > 0
-    return hasNewFiles || hasSelectedHistory || availableFiles.length > 0
-  }, [isProcessing, isUploading, query, isEmptyConversation, fileItems, selectedHistoryFiles, availableFiles])
+    
+    // 允许纯文本聊天，不强制要求文件
+    return true
+  }, [isProcessing, isUploading, query])
 
   // 添加文件
   const handleAddFiles = (files: File[]) => {

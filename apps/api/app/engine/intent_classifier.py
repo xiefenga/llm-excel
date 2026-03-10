@@ -86,6 +86,9 @@ class IntentClassifier:
 }}
 ```
 
+## 历史对话上下文
+{history}
+
 ## 用户请求
 
 用户query: {query}
@@ -105,7 +108,8 @@ class IntentClassifier:
         self, 
         query: str, 
         has_files: bool = False,
-        file_count: int = 0
+        file_count: int = 0,
+        history: str = ""
     ) -> Dict:
         """
         分类用户意图
@@ -126,6 +130,7 @@ class IntentClassifier:
         try:
             # 构建分类提示词
             prompt = self.INTENT_CLASSIFICATION_PROMPT.format(
+                history=history if history else "无历史记录，这是第一轮对话",  # 👈 塞入历史
                 query=query,
                 has_files="是" if has_files else "否"
             )

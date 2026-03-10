@@ -330,21 +330,8 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
       return
     }
 
-    // 有历史记录时，提示用户开启新会话
-    if (hasHistory) {
-      // 新会话需要文件
-      if (files.length === 0) {
-        return
-      }
-      setShowNewSessionDialog(true)
-      return
-    }
-
-    // 新会话需要文件
-    if (files.length === 0) {
-      return
-    }
-
+    // 有历史记录时，直接继续当前会话（支持多轮对话）
+    // 不再提示用户开启新会话
     doSendMessage(threadId)
   }
 
@@ -407,7 +394,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
           <AlertDialogHeader>
             <AlertDialogTitle>开启新会话</AlertDialogTitle>
             <AlertDialogDescription>
-              目前只支持单轮会话，确认后将开启新会话。
+              确认开启新会话吗？当前会话的历史记录将被清空。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className='justify-center!'>

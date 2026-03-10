@@ -117,7 +117,7 @@ async def process_request(
                     )
                     return
 
-# 获取意图服务并识别
+            # 获取意图服务并识别
             intent_service = await get_intent_service(db)
             intent_result = await intent_service.recognize_intent(
                 query=request.query,
@@ -174,7 +174,8 @@ async def process_request(
                             query=request.query,
                             user_id=current_user.id,
                             thread_id=UUID(actual_thread_id),
-                            db_session=db
+                            db_session=db,
+                            file_ids=file_ids
                         ):
                             full_reply += chunk
                             yield sse({"step": "chat", "status": "streaming", "delta": chunk}, event="message")
@@ -232,6 +233,32 @@ async def process_request(
                     logger.warning(f"保存上下文快照失败（不影响主流程）: {e}")
 
                 await repo.mark_processing(turn_id, tracker)
+                # =======================================================
+                # 💡 核心修复：为数据处理模块补充历史上下文
+                # =======================================================
+                enhanced_query = request.query
+                try:
+                    # 获取最近的几轮历史对话（比如最近3轮）
+                    recent_turns = await repo.get_thread_turns(UUID(actual_thread_id), limit=3)
+                    
+                    # recent_turns 是倒序的（包含刚刚创建的当前轮次）
+                    # 如果记录大于1条，说明有历史记录可以参考
+                    if recent_turns and len(recent_turns) > 1:
+                        history_text = ""
+                        # 排除刚创建的当前轮次(recent_turns[0])，取之前的轮次并反转回正序
+                        for t in reversed(recent_turns[1:]): 
+                            if t.user_query:
+                                history_text += f"用户: {t.user_query}\n"
+                            if t.response_text:
+                                history_text += f"助手: {t.response_text}\n"
+
+                        if history_text:
+                            # 将历史背景和当前指令结合
+                            enhanced_query = f"【历史对话背景】\n{history_text}\n【当前用户最新补充指令】\n{request.query}\n\n请结合上述历史背景，执行当前最新指令对数据进行处理。"
+                            logger.info(f"🧩 组装增强版处理需求: \n{enhanced_query}")
+                except Exception as e:
+                    logger.warning(f"获取历史对话构建增强查询失败: {e}")
+                # =======================================================
 
                 async def on_event(ctx: StageContext):
                     if ctx.event_type == EventType.STAGE_START:
@@ -264,7 +291,7 @@ async def process_request(
 
                 async for sse_event in stream_excel_processing(
                     load_tables_fn=load_tables,
-                    query=request.query,
+                    query=enhanced_query,
                     stream_llm=True,
                     export_path_prefix=f"users/{current_user.id}/outputs",
                     on_event=on_event,
