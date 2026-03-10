@@ -126,6 +126,8 @@ async def process_request(
                 db_session=db
             )
 
+            file_ids = intent_result.get("file_ids", file_ids)#文件继承
+
             # 🛑 注意：我把原来的 yield sse(..., event="session") 从这里删掉了！
             # 我们要在下面的分支里，拿到真正的 thread_id 后再发给前端。
 
