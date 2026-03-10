@@ -14,6 +14,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.sse import sse
 from app.models.user import User
 from app.services.intent_service import get_intent_service
+from app.services.chat_service import get_chat_service
 from app.engine.intent_classifier import IntentType
 
 import json
@@ -135,28 +136,55 @@ async def process_request(
             # 分支 A：需要澄清 (反问) 或 纯聊天 (Chat)
             # ==========================================
             if intent_result.get("requires_clarification") or intent_result.get("intent") == IntentType.CHAT.value:
-                # 确定回复内容
-                reply_text = intent_result.get("clarification_question") 
-                if not reply_text:
-                    reply_text = "我理解您想进行对话交流，目前我主要负责数据处理。请问有什么我可以帮您操作的吗？"
-
-                # 💡 改动 1：伪装成 chat 步骤发送流，而不是 generate
-                yield sse({"step": "chat", "status": "running"}, event="message")
+                # 获取聊天服务
+                chat_service = await get_chat_service(db)
                 
-                # 模拟打字机流式输出 (若接入真实的 LLM stream 接口，此处可替换为 async for char in llm_stream)
-                for char in reply_text:
-                    # 💡 改动 2：这里也改成 chat
-                    yield sse({"step": "chat", "status": "streaming", "delta": char}, event="message")
-                    await asyncio.sleep(0.02)
+                # 确定是否需要先发反问/澄清
+                reply_text = intent_result.get("clarification_question")
                 
-                # 💡 改动 3：改成 chat，并把完整的回复作为 output 发给前端，防止文字消失！
-                yield sse({"step": "chat", "status": "done", "output": reply_text}, event="message")
+                # 1. 如果有反问/澄清文本，继续用模拟流式输出
+                if reply_text:
+                    yield sse({"step": "chat", "status": "running"}, event="message")
+                    for char in reply_text:
+                        yield sse({"step": "chat", "status": "streaming", "delta": char}, event="message")
+                        await asyncio.sleep(0.02)
+                    yield sse({"step": "chat", "status": "done", "output": reply_text}, event="message")
+                
+                # 2. 💡 真正的纯聊天，直接对接大模型真实的流式输出 (chat_stream)
+                elif intent_result.get("intent") == IntentType.CHAT.value:
+                    yield sse({"step": "chat", "status": "running"}, event="message")
+                    full_reply = ""
+                    try:
+                        # 调用 chat_service 的 chat_stream 接口
+                        async for chunk in chat_service.chat_stream(
+                            query=request.query,
+                            user_id=current_user.id,
+                            thread_id=UUID(request.thread_id) if request.thread_id else None,
+                            db_session=db
+                        ):
+                            full_reply += chunk
+                            yield sse({"step": "chat", "status": "streaming", "delta": chunk}, event="message")
+                            
+                        # 流式结束后，发送 done 状态和完整的 output
+                        yield sse({"step": "chat", "status": "done", "output": full_reply}, event="message")
+                        
+                    except Exception as e:
+                        logger.error(f"聊天服务流式调用失败: {e}", exc_info=True)
+                        error_msg = "抱歉，目前系统出小差了，请稍后再试。"
+                        yield sse({"step": "chat", "status": "done", "output": error_msg}, event="message")
+                
+                else:
+                    # 兜底回复
+                    fallback_msg = "您的需求不够明确，请具体说明您想做什么操作。"
+                    yield sse({"step": "chat", "status": "done", "output": fallback_msg}, event="message")
 
                 # ==========================================
                 # 数据库持久化：保存 AI 的回复
                 # ==========================================
-                # TODO: 请根据你的模型取消注释并修改
-                # ai_msg = ThreadTurn(thread_id=request.thread_id, role="assistant", content=reply_text)
+                # ⚠️ 注意：如果你的 chat_service.chat_stream 内部已经写了保存 AI 回复到数据库的逻辑，
+                # 这里千万不要再存一遍了，否则会产生重复的对话记录。
+                # 如果内部没存，你再取消这里的注释自己存。
+                # ai_msg = ThreadTurn(thread_id=request.thread_id, role="assistant", content=full_reply)
                 # db.add(ai_msg)
                 # await db.commit()
 
@@ -171,6 +199,9 @@ async def process_request(
                 # 1. 初始化会话和 Tracker
                 repo = TurnRepository(db)
                 tracker = StepTracker()
+                
+                # 获取意图识别结果中的上下文信息
+                intent_context = intent_result.get("context", {})
                 
                 # 尝试初始化会话 (复用原有的 _init_session)
                 session_result = await _init_session(
@@ -188,7 +219,23 @@ async def process_request(
                 turn_id = UUID(session_result["turn_id"])
                 actual_thread_id = UUID(session_result["thread_id"])
 
-                # 标记处理中
+                # 2. 保存上下文快照（如果意图识别结果中有上下文信息）
+                try:
+                    if intent_context and "context_type" in intent_context:
+                        # 导入ContextService
+                        from app.services.context_service import get_context_service
+                        
+                        # 获取上下文服务
+                        context_service = await get_context_service(db)
+                        
+                        # 保存上下文快照
+                        await context_service.save_context_snapshot(turn_id, intent_context)
+                        
+                        logger.info(f"已保存上下文快照: turn_id={turn_id}, context_type={intent_context.get('context_type')}")
+                except Exception as e:
+                    logger.warning(f"保存上下文快照失败（不影响主流程）: {e}")
+
+                # 3. 标记处理中
                 await repo.mark_processing(turn_id, tracker)
 
                 # 定义事件回调：处理持久化

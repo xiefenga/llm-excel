@@ -6,6 +6,7 @@ from uuid import UUID
 from datetime import datetime
 
 from app.engine.llm_client import LLMClient
+from app.engine.context_builder import ContextBuilder, create_context_builder
 from app.core.database import AsyncSessionLocal
 from app.api.deps import get_llm_client
 from app.persistence.turn_repository import TurnRepository
@@ -45,14 +46,16 @@ class ChatService:
 
 现在开始与用户对话。"""
 
-    def __init__(self, llm_client: LLMClient):
+    def __init__(self, llm_client: LLMClient, context_builder: Optional[ContextBuilder] = None):
         """
         初始化聊天服务
         
         Args:
             llm_client: LLM客户端
+            context_builder: 上下文构建器（可选）
         """
         self.llm_client = llm_client
+        self.context_builder = context_builder or create_context_builder()
     
     async def chat(
         self,
@@ -272,14 +275,59 @@ class ChatService:
         """
         messages = []
         
-        # 添加系统提示
-        messages.append({
-            "role": "system",
-            "content": self.CHAT_SYSTEM_PROMPT
-        })
+        # 使用ContextBuilder构建聊天上下文
+        try:
+            # 将历史转换为ContextBuilder所需的格式
+            context_data = {
+                "current_query": query,
+                "history_turns": [],
+                "current_files": [],
+                "intent_type": "chat"
+            }
+            
+            # 转换历史记录
+            for i, msg in enumerate(history[-10:]):  # 限制历史长度
+                if msg["role"] == "user":
+                    context_data["history_turns"].append({
+                        "query": msg["content"],
+                        "response_text": None,
+                        "intent_type": "chat",
+                        "created_at": msg.get("timestamp")
+                    })
+                elif msg["role"] == "assistant" and context_data["history_turns"]:
+                    # 将回复添加到最后一个用户消息
+                    context_data["history_turns"][-1]["response_text"] = msg["content"]
+            
+            # 构建格式化上下文
+            formatted_context = self.context_builder.build_prompt_context(
+                intent_type="chat",
+                current_query=query,
+                history_turns=context_data["history_turns"],
+                current_files=context_data["current_files"]
+            )
+            
+            # 构建增强的系统提示
+            enhanced_system_prompt = f"""{self.CHAT_SYSTEM_PROMPT}
+
+## 对话上下文
+{formatted_context}
+
+请基于以上上下文回答用户的问题。"""
+            
+            messages.append({
+                "role": "system",
+                "content": enhanced_system_prompt
+            })
+            
+        except Exception as e:
+            logger.warning(f"构建聊天上下文失败，使用默认系统提示: {e}")
+            messages.append({
+                "role": "system",
+                "content": self.CHAT_SYSTEM_PROMPT
+            })
         
         # 添加历史消息（最近的优先）
-        for msg in reversed(history[-20:]):  # 限制历史长度
+        for msg in reversed(history[-10:]):  # 限制历史长度
             messages.append({
                 "role": msg["role"],
                 "content": msg["content"]
@@ -510,8 +558,11 @@ async def get_chat_service(db_session: Optional[AsyncSessionLocal] = None) -> Ch
         # 获取LLM客户端
         llm_client = await get_llm_client(db_session)
         
+        # 创建ContextBuilder
+        context_builder = create_context_builder()
+        
         # 创建聊天服务
-        return ChatService(llm_client)
+        return ChatService(llm_client, context_builder)
         
     except Exception as e:
         logger.error(f"创建聊天服务失败: {e}", exc_info=True)

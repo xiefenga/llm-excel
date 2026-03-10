@@ -22,6 +22,7 @@ from app.core.sse import (
 from app.engine.models import FileCollection, column_index_to_letter
 from app.processor import ExcelProcessor, ProcessConfig, EventType
 from app.services.oss import upload_file
+from app.engine.context_builder import create_context_builder
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,8 @@ async def stream_excel_processing(
     on_event: Optional[StageCallback] = None,
     on_failure: Optional[FailureCallback] = None,
     on_load_tables: Optional[Callable[[FileCollection], Awaitable[None]]] = None,
+    history_turns: Optional[List[Dict[str, Any]]] = None,
+    current_files: Optional[List[Dict[str, Any]]] = None,
 ) -> AsyncGenerator[ServerSentEvent, None]:
     """
     完整的 Excel 处理流式输出
@@ -199,6 +202,8 @@ async def stream_excel_processing(
         on_event: 事件回调（用于持久化等副作用）
         on_failure: 整体流程失败回调（用于埋点等副作用）
         on_load_tables: 加载表格后回调（可用于缓存等副作用）
+        history_turns: 历史对话记录（用于上下文构建）
+        current_files: 当前文件信息（用于上下文构建）
 
     Yields:
         ServerSentEvent 事件
@@ -210,6 +215,8 @@ async def stream_excel_processing(
             query=params.query,
             export_path_prefix=f"users/{user_id}/outputs",
             on_event=on_event,
+            history_turns=history_turns,
+            current_files=current_files,
         ):
             yield sse
 
@@ -259,10 +266,23 @@ async def stream_excel_processing(
 
     # === 2. generate/validate/execute ===
     llm_client = await get_llm_client()
-    processor = ExcelProcessor(llm_client)
+    
+    # 创建上下文构建器（如果提供了历史记录）
+    context_builder = None
+    if history_turns is not None:
+        context_builder = create_context_builder()
+    
+    processor = ExcelProcessor(llm_client, context_builder)
     config = ProcessConfig(stream_llm=stream_llm)
 
-    gen = processor.process(tables, query, config)
+    # 构建上下文字典，传递给处理器
+    context = {}
+    if history_turns is not None:
+        context["history_turns"] = history_turns
+    if current_files is not None:
+        context["current_files"] = current_files
+    
+    gen = processor.process(tables, query, config, context)
     _GENERATOR_DONE = object()
 
     def get_next_event():

@@ -40,7 +40,7 @@ class IntentService:
     ) -> Dict:
         """
         识别用户意图并返回路由决策
-        
+
         Args:
             query: 用户查询文本
             file_ids: 文件ID列表
@@ -81,11 +81,12 @@ class IntentService:
                 has_files=has_files
             )
             
-            # 构建上下文信息
+            # 构建上下文信息 - 使用增强的ContextService
             context = await self._build_context(
                 intent=intent,
                 thread_id=thread_id,
                 file_ids=file_ids,
+                query=query,  # 添加当前查询参数
                 db_session=db_session
             )
             
@@ -146,6 +147,7 @@ class IntentService:
         intent: str,
         thread_id: Optional[str],
         file_ids: List[str],
+        query: str,
         db_session: Optional[AsyncSessionLocal] = None
     ) -> Dict:
         """
@@ -155,29 +157,77 @@ class IntentService:
             intent: 意图类型
             thread_id: 线程ID
             file_ids: 文件ID列表
+            query: 当前用户查询
             db_session: 数据库会话
             
         Returns:
             上下文信息字典
         """
-        context = {
-            "intent": intent,
-            "thread_id": thread_id,
-            "file_ids": file_ids,
-            "has_files": len(file_ids) > 0,
-            "timestamp": self._get_current_timestamp()
-        }
+        # 如果没有数据库会话，返回简化上下文
+        if not db_session:
+            return {
+                "intent": intent,
+                "thread_id": thread_id,
+                "file_ids": file_ids,
+                "has_files": len(file_ids) > 0,
+                "current_query": query,
+                "timestamp": self._get_current_timestamp(),
+                "note": "简化上下文（无数据库会话）"
+            }
         
-        # 如果有线程ID，可以添加更多上下文信息
-        if thread_id and db_session:
-            try:
-                # 这里可以添加获取线程历史等逻辑
-                # 例如：获取之前的对话记录、操作历史等
-                pass
-            except Exception as e:
-                logger.warning(f"构建线程上下文失败: {e}")
-        
-        return context
+        try:
+            # 导入ContextService（避免循环导入）
+            from app.services.context_service import get_context_service
+            
+            # 获取上下文服务
+            context_service = await get_context_service(db_session)
+            
+            # 如果有线程ID，构建完整上下文
+            if thread_id:
+                try:
+                    from uuid import UUID
+                    thread_uuid = UUID(thread_id)
+                    
+                    # 构建完整上下文
+                    context_data = await context_service.build_context(
+                        thread_id=thread_uuid,
+                        current_turn_id=None,  # 当前还没有创建turn
+                        intent_type=intent,
+                        current_query=query,
+                        file_ids=file_ids,
+                        max_history=5
+                    )
+                    
+                    return context_data
+                    
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"线程ID格式错误或构建上下文失败: {e}, thread_id={thread_id}")
+                    # 继续使用简化上下文
+            
+            # 返回简化上下文
+            return {
+                "intent": intent,
+                "thread_id": thread_id,
+                "file_ids": file_ids,
+                "has_files": len(file_ids) > 0,
+                "current_query": query,
+                "timestamp": self._get_current_timestamp(),
+                "note": "简化上下文（无有效线程ID或构建失败）"
+            }
+            
+        except Exception as e:
+            logger.error(f"构建上下文失败: {e}", exc_info=True)
+            # 返回错误上下文
+            return {
+                "intent": intent,
+                "thread_id": thread_id,
+                "file_ids": file_ids,
+                "has_files": len(file_ids) > 0,
+                "current_query": query,
+                "timestamp": self._get_current_timestamp(),
+                "error": str(e),
+                "note": "上下文构建失败"
+            }
     
     def _get_error_result(self, query: str, file_ids: List[str], error_msg: str) -> Dict:
         """获取错误结果"""

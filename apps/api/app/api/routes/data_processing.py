@@ -234,11 +234,22 @@ async def _init_session(
     query: str,
     file_ids: List[UUID],
     thread_id: Optional[UUID],
+    parent_turn_id: Optional[UUID] = None,
+    context_snapshot: Optional[dict] = None,
 ) -> dict:
     """
     初始化会话
 
     创建或获取 Thread，创建 Turn，关联文件。
+
+    Args:
+        repo: TurnRepository实例
+        user_id: 用户ID
+        query: 用户查询
+        file_ids: 文件ID列表
+        thread_id: 线程ID（可选）
+        parent_turn_id: 父轮次ID（可选，用于对话链）
+        context_snapshot: 上下文快照（可选）
 
     Returns:
         {
@@ -271,9 +282,15 @@ async def _init_session(
         thread_id = thread.id
         is_new_thread = True
 
-    # 创建 turn
+    # 创建 turn（支持父轮次ID和上下文快照）
     turn_number = await repo.get_next_turn_number(thread_id)
-    turn = await repo.create_turn(thread_id, turn_number, query)
+    turn = await repo.create_turn(
+        thread_id=thread_id,
+        turn_number=turn_number,
+        user_query=query,
+        parent_turn_id=parent_turn_id,
+        context_snapshot=context_snapshot,
+    )
 
     # 关联文件
     try:

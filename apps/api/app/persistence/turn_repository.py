@@ -70,6 +70,26 @@ class TurnRepository:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+    
+    async def get_thread_turns(self, thread_id: UUID, limit: int = 10) -> List[ThreadTurn]:
+        """
+        获取线程的历史对话轮次
+
+        Args:
+            thread_id: 线程 ID
+            limit: 返回的最大轮次数
+
+        Returns:
+            按轮次倒序排列的 ThreadTurn 列表（最新的在前）
+        """
+        stmt = (
+            select(ThreadTurn)
+            .where(ThreadTurn.thread_id == thread_id)
+            .order_by(ThreadTurn.turn_number.desc())
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
     async def create_thread(
         self,
@@ -120,6 +140,8 @@ class TurnRepository:
         user_query: str,
         intent_type: Optional[str] = None,
         response_text: Optional[str] = None,
+        parent_turn_id: Optional[UUID] = None,
+        context_snapshot: Optional[dict] = None,
     ) -> ThreadTurn:
         """
         创建新的 turn
@@ -130,6 +152,8 @@ class TurnRepository:
             user_query: 用户查询
             intent_type: 意图类型（可选）
             response_text: AI 回复文本（可选）
+            parent_turn_id: 父轮次ID（可选，用于对话链）
+            context_snapshot: 上下文快照（可选）
 
         Returns:
             新创建的 ThreadTurn 对象
@@ -143,6 +167,8 @@ class TurnRepository:
             intent_type=intent_type,
             response_text=response_text,
             steps=[],
+            parent_turn_id=parent_turn_id,
+            context_snapshot=context_snapshot,
         )
         self.db.add(turn)
         await self.db.flush()
@@ -313,6 +339,42 @@ class TurnRepository:
             turn.steps = make_json_serializable(tracker.to_list())
             flag_modified(turn, "steps")
             await self.db.flush()
+
+    async def update_context_snapshot(
+        self,
+        turn_id: UUID,
+        context_snapshot: dict,
+    ) -> bool:
+        """
+        更新上下文快照
+
+        Args:
+            turn_id: Turn ID
+            context_snapshot: 上下文快照数据
+
+        Returns:
+            是否更新成功
+        """
+        try:
+            stmt = select(ThreadTurn).where(ThreadTurn.id == turn_id)
+            result = await self.db.execute(stmt)
+            turn = result.scalar_one_or_none()
+            
+            if not turn:
+                logger.error(f"更新上下文快照失败: 找不到轮次 {turn_id}")
+                return False
+            
+            # 更新上下文快照
+            turn.context_snapshot = make_json_serializable(context_snapshot)
+            flag_modified(turn, "context_snapshot")
+            await self.db.flush()
+            
+            logger.info(f"更新上下文快照成功: turn_id={turn_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"更新上下文快照失败: {e}", exc_info=True)
+            return False
 
     async def commit(self) -> None:
         """提交事务"""
