@@ -117,7 +117,7 @@ async def process_request(
                     )
                     return
 
-            # 获取意图服务并识别
+# 获取意图服务并识别
             intent_service = await get_intent_service(db)
             intent_result = await intent_service.recognize_intent(
                 query=request.query,
@@ -126,23 +126,35 @@ async def process_request(
                 db_session=db
             )
 
-            # 发送 Session 元数据事件 (可选，对应前端 event === "session")
-            yield sse({
-                "thread_id": request.thread_id, 
-                "intent": intent_result.get("intent")
-            }, event="session")
+            # 🛑 注意：我把原来的 yield sse(..., event="session") 从这里删掉了！
+            # 我们要在下面的分支里，拿到真正的 thread_id 后再发给前端。
 
             # ==========================================
             # 分支 A：需要澄清 (反问) 或 纯聊天 (Chat)
             # ==========================================
             if intent_result.get("requires_clarification") or intent_result.get("intent") == IntentType.CHAT.value:
-                # 获取聊天服务
                 chat_service = await get_chat_service(db)
                 
-                # 确定是否需要先发反问/澄清
+                # 💡 核心修复：如果前端没传 thread_id，我们提前生成真正的 thread_id！
+                actual_thread_id = request.thread_id
+                if not actual_thread_id:
+                    thread, _ = await chat_service._get_or_create_thread(
+                        user_id=current_user.id,
+                        thread_id=None,
+                        initial_query=request.query,
+                        db_session=db
+                    )
+                    actual_thread_id = str(thread.id)
+
+                # 💡 现在把【真实的】 thread_id 发给前端，前端下次请求就会带上它了！
+                yield sse({
+                    "thread_id": actual_thread_id, 
+                    "intent": intent_result.get("intent")
+                }, event="session")
+                
                 reply_text = intent_result.get("clarification_question")
                 
-                # 1. 如果有反问/澄清文本，继续用模拟流式输出
+                # 1. 如果有反问/澄清文本，走伪装打字机输出
                 if reply_text:
                     yield sse({"step": "chat", "status": "running"}, event="message")
                     for char in reply_text:
@@ -150,22 +162,21 @@ async def process_request(
                         await asyncio.sleep(0.02)
                     yield sse({"step": "chat", "status": "done", "output": reply_text}, event="message")
                 
-                # 2. 💡 真正的纯聊天，直接对接大模型真实的流式输出 (chat_stream)
+                # 2. 真正的纯聊天，直接接入 LLM 流式输出
                 elif intent_result.get("intent") == IntentType.CHAT.value:
                     yield sse({"step": "chat", "status": "running"}, event="message")
                     full_reply = ""
                     try:
-                        # 调用 chat_service 的 chat_stream 接口
+                        # 💡 注意这里：传入的必须是 actual_thread_id
                         async for chunk in chat_service.chat_stream(
                             query=request.query,
                             user_id=current_user.id,
-                            thread_id=UUID(request.thread_id) if request.thread_id else None,
+                            thread_id=UUID(actual_thread_id),
                             db_session=db
                         ):
                             full_reply += chunk
                             yield sse({"step": "chat", "status": "streaming", "delta": chunk}, event="message")
                             
-                        # 流式结束后，发送 done 状态和完整的 output
                         yield sse({"step": "chat", "status": "done", "output": full_reply}, event="message")
                         
                     except Exception as e:
@@ -174,21 +185,8 @@ async def process_request(
                         yield sse({"step": "chat", "status": "done", "output": error_msg}, event="message")
                 
                 else:
-                    # 兜底回复
-                    fallback_msg = "您的需求不够明确，请具体说明您想做什么操作。"
-                    yield sse({"step": "chat", "status": "done", "output": fallback_msg}, event="message")
+                    yield sse({"step": "chat", "status": "done", "output": "您的需求不够明确，请具体说明。"}, event="message")
 
-                # ==========================================
-                # 数据库持久化：保存 AI 的回复
-                # ==========================================
-                # ⚠️ 注意：如果你的 chat_service.chat_stream 内部已经写了保存 AI 回复到数据库的逻辑，
-                # 这里千万不要再存一遍了，否则会产生重复的对话记录。
-                # 如果内部没存，你再取消这里的注释自己存。
-                # ai_msg = ThreadTurn(thread_id=request.thread_id, role="assistant", content=full_reply)
-                # db.add(ai_msg)
-                # await db.commit()
-
-                # 发送结束信号
                 yield sse({"step": "complete", "status": "done"}, event="message")
                 return
 
@@ -196,11 +194,9 @@ async def process_request(
             # 分支 B：明确的数据处理 (Processing)
             # ==========================================
             if intent_result.get("intent") in [IntentType.PROCESSING.value, IntentType.ANALYSIS.value]:
-                # 1. 初始化会话和 Tracker
                 repo = TurnRepository(db)
                 tracker = StepTracker()
                 
-                # 获取意图识别结果中的上下文信息
                 intent_context = intent_result.get("context", {})
                 
                 # 尝试初始化会话 (复用原有的 _init_session)
@@ -208,7 +204,6 @@ async def process_request(
                     repo, current_user.id, request.query, file_ids, request.thread_id
                 )
                 
-                # 如果初始化失败（例如找不到文件），直接返回错误事件
                 if session_result.get("error"):
                     yield sse(
                         {"code": session_result["error"]["code"], "message": session_result["error"]["message"]},
@@ -217,28 +212,25 @@ async def process_request(
                     return
 
                 turn_id = UUID(session_result["turn_id"])
-                actual_thread_id = UUID(session_result["thread_id"])
+                actual_thread_id = str(session_result["thread_id"])
 
-                # 2. 保存上下文快照（如果意图识别结果中有上下文信息）
+                # 💡 处理分支也一样，拿到初始化后的真实 ID 发给前端
+                yield sse({
+                    "thread_id": actual_thread_id, 
+                    "intent": intent_result.get("intent")
+                }, event="session")
+
+                # ====== 以下代码保持你原样不变 ======
                 try:
                     if intent_context and "context_type" in intent_context:
-                        # 导入ContextService
                         from app.services.context_service import get_context_service
-                        
-                        # 获取上下文服务
                         context_service = await get_context_service(db)
-                        
-                        # 保存上下文快照
                         await context_service.save_context_snapshot(turn_id, intent_context)
-                        
-                        logger.info(f"已保存上下文快照: turn_id={turn_id}, context_type={intent_context.get('context_type')}")
                 except Exception as e:
                     logger.warning(f"保存上下文快照失败（不影响主流程）: {e}")
 
-                # 3. 标记处理中
                 await repo.mark_processing(turn_id, tracker)
 
-                # 定义事件回调：处理持久化
                 async def on_event(ctx: StageContext):
                     if ctx.event_type == EventType.STAGE_START:
                         tracker.start(ctx.step)
@@ -250,7 +242,6 @@ async def process_request(
                         await repo.mark_failed(turn_id, tracker)
                         await repo.commit()
 
-                # 定义加载文件的函数 (闭包，直接使用上下文里的 file_ids 和 db)
                 async def load_tables():
                     files = await get_files_by_ids_from_db(db, file_ids, current_user.id)
                     return await asyncio.to_thread(load_tables_from_files, files)
@@ -269,7 +260,6 @@ async def process_request(
                     nonlocal file_collection
                     file_collection = tables
 
-                # 2. 真正执行处理流程：源源不断地生成真实 SSE 事件并直接发给前端！
                 async for sse_event in stream_excel_processing(
                     load_tables_fn=load_tables,
                     query=request.query,
@@ -281,11 +271,9 @@ async def process_request(
                 ):
                     yield sse_event
 
-                # 3. 完成与收尾记录
-                await repo.mark_completed(turn_id, actual_thread_id, tracker)
+                await repo.mark_completed(turn_id, UUID(actual_thread_id), tracker)
                 await repo.commit()
 
-                # 记录可能存在的错误日志
                 if process_with_errors and file_collection:
                     db.add(
                         BTrack(

@@ -132,19 +132,10 @@ class ChatService:
         db_session: Optional[AsyncSessionLocal] = None
     ) -> AsyncGenerator[str, None]:
         """
-        流式聊天
-        
-        Args:
-            query: 用户查询
-            user_id: 用户ID
-            thread_id: 线程ID
-            db_session: 数据库会话
-            
-        Yields:
-            流式回复片段
+        流式聊天（已接入富上下文系统）
         """
         try:
-            # 获取或创建对话线程
+            # 1. 获取或创建对话线程
             thread, is_new_thread = await self._get_or_create_thread(
                 user_id=user_id,
                 thread_id=thread_id,
@@ -152,32 +143,52 @@ class ChatService:
                 db_session=db_session
             )
             
-            # 获取对话历史
-            history = await self._get_conversation_history(
+            # 💡 2. 使用你新增的 ContextService 提取并构建结构化上下文数据
+            from app.services.context_service import get_context_service
+            context_service = await get_context_service(db_session)
+            
+            # 这一步会自动去数据库拿历史，并按 chat 意图进行组装
+            context_data = await context_service.build_context(
                 thread_id=thread.id,
-                db_session=db_session
+                current_turn_id=None,
+                intent_type="chat",
+                current_query=query,
+                file_ids=[],
+                max_history=10
             )
             
-            # 构建LLM消息
-            messages = self._build_messages(query, history)
+            # 💡 3. 使用 ContextBuilder 将字典数据渲染成 LLM 能看懂的 Markdown 文本
+            formatted_context = self.context_builder.build_prompt_context(
+                intent_type="chat",
+                context_data=context_data,
+                current_query=query,
+                current_files=[]
+            )
             
-            # 流式生成回复
+            # 💡 4. 组装终极 System Prompt（基础人设 + 历史记忆）
+            enhanced_system_prompt = f"{self.CHAT_SYSTEM_PROMPT}\n\n{formatted_context}\n请基于以上上下文回答用户的问题。"
+            
+            # 💡 5. 流式生成回复（这次把 enhanced_system_prompt 真正喂给大模型）
             full_response = ""
             async for delta, content in self.llm_client._call_llm_stream_async(
                 stage="chat",
-                system_prompt=self.CHAT_SYSTEM_PROMPT,
+                system_prompt=enhanced_system_prompt,
                 user_message=query
             ):
                 full_response = content
                 yield delta
             
-            # 保存对话记录
-            await self._save_conversation_turn(
+            # 6. 保存当前对话轮次
+            turn = await self._save_conversation_turn(
                 thread_id=thread.id,
                 query=query,
                 response=full_response,
                 db_session=db_session
             )
+            
+            # 💡 7. 顺手将这次对话的上下文拍个快照存进数据库，方便以后追溯
+            if turn:
+                await context_service.save_context_snapshot(turn.id, context_data)
             
             logger.info(f"流式聊天完成: user={user_id}, thread={thread.id}, "
                        f"response_length={len(full_response)}")
