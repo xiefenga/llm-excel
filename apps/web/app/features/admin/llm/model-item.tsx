@@ -1,4 +1,5 @@
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -6,12 +7,15 @@ import { Switch } from "~/components/ui/switch";
 import { LLMStatus } from "~/lib/llm-types";
 import type { LLMModel } from "~/lib/llm-types";
 import { useUpdateModel, useDeleteModel } from "~/features/admin/llm/hooks";
+import { EditModelDialog } from "~/features/admin/llm/edit-model-dialog";
 
 interface ModelItemProps {
   model: LLMModel;
+  providerType: string;
 }
 
-export const ModelItem = ({ model }: ModelItemProps) => {
+export const ModelItem = ({ model, providerType }: ModelItemProps) => {
+  const [editOpen, setEditOpen] = useState(false);
   const updateModel = useUpdateModel(model.provider_id);
   const deleteModelMutation = useDeleteModel(model.provider_id);
 
@@ -42,37 +46,54 @@ export const ModelItem = ({ model }: ModelItemProps) => {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-accent/30">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{model.name}</span>
-          <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
-            {model.model_id}
-          </code>
+    <>
+      <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-accent/30">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate">{model.name}</span>
+            <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+              {model.model_id}
+            </code>
+          </div>
+          {maxTokens && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Max Tokens: {maxTokens.toLocaleString()}
+            </p>
+          )}
         </div>
-        {maxTokens && (
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Max Tokens: {maxTokens.toLocaleString()}
-          </p>
-        )}
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={handleToggle}
+            disabled={updateModel.isPending}
+          />
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={handleDelete}
+            disabled={deleteModelMutation.isPending}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <Switch
-          checked={isEnabled}
-          onCheckedChange={handleToggle}
-          disabled={updateModel.isPending}
-        />
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="text-muted-foreground hover:text-destructive"
-          onClick={handleDelete}
-          disabled={deleteModelMutation.isPending}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-      </div>
-    </div>
+      <EditModelDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        model={model}
+        providerType={providerType}
+      />
+    </>
   );
 };
