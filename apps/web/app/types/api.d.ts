@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/excel/chat": {
+    "/intent/process": {
         parameters: {
             query?: never;
             header?: never;

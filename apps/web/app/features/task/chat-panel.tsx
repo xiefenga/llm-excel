@@ -309,12 +309,41 @@ const TurnRenderer = ({
           {/* 步骤列表 */}
           {hasSteps && (
             <section className="space-y-2">
-              {assistantMessage.steps.map((record, index) => (
-                <StepItem
-                  key={`${record.step}-${index}`}
-                  record={record}
-                />
-              ))}
+              {assistantMessage.steps.map((record, index) => {
+                // ==========================================
+                // 💡 重点修改位置：拦截 'chat' 步骤，用普通文本渲染
+                // ==========================================
+                if (record.step === 'chat') {
+                  let content = '';
+                  // 巧妙利用 as any 绕过 TypeScript 对联合类型的严格检查
+                  if (record.status === 'streaming') {
+                    content = (record as any).streamContent || '';
+                  } else if (record.status === 'done') {
+                    content = (record as any).output || '';
+                  }
+
+                  return (
+                    <div 
+                      key={`${record.step}-${index}`} 
+                      className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap py-2 px-1"
+                    >
+                      {typeof content === 'string' ? content : ''}
+                      {/* 流式输出时显示一个闪烁的光标 */}
+                      {record.status === 'streaming' && <span className="animate-pulse">_</span>}
+                    </div>
+                  );
+                }
+
+                // ==========================================
+                // 非 chat 步骤 (如 generate, execute) 依然交给 StepItem 渲染
+                // ==========================================
+                return (
+                  <StepItem
+                    key={`${record.step}-${index}`}
+                    record={record}
+                  />
+                );
+              })}
 
               {/* 全局错误 */}
               {assistantMessage.status === 'error' && assistantMessage.error && (

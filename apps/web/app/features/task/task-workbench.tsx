@@ -61,23 +61,29 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
   const fileUpload = useFileUpload()
 
   // 聊天/处理逻辑
-  const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useChat({
-    onStart: () => {
-      setTaskState('processing')
-    },
-    onSessionCreated: ({ thread_id }) => {
+// 修改 task-workbench.tsx 中的 useChat 部分
+const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useChat({
+  onStart: () => {
+    setTaskState('processing')
+  },
+  onSessionCreated: ({ thread_id }) => {
+    // 👇 修复：严格判断 thread_id 是否有效
+    if (thread_id && thread_id !== 'null' && thread_id !== 'undefined') {
       initThreadId.current = thread_id
       navigate(`/threads/${thread_id}`)
       queryClient.invalidateQueries({ queryKey: ['threads'] })
-    },
-    onExportSuccess: (files) => {
-      setOutputFiles(files)
-      setTaskState('done')
-      setActiveTurnId(null)
-      // 自动切换到输出预览
-      setPreviewTab('output')
-    },
-  })
+    } else {
+      // 意图澄清阶段或后端尚未落库时，留在当前无 ID 的状态，直接渲染流式对话即可
+      console.log('当前为意图澄清阶段或暂无 thread_id，跳过路由跳转')
+    }
+  },
+  onExportSuccess: (files) => {
+    setOutputFiles(files)
+    setTaskState('done')
+    setActiveTurnId(null)
+    setPreviewTab('output')
+  },
+})
 
   // 将 messages 转换为 turns 格式
   const turns = useMemo<ConversationTurn[]>(() => {

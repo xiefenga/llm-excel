@@ -32,7 +32,8 @@ export interface InputType {
 
 
 /** 步骤名称列表（用于验证） */
-const STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export"];
+// use-chat.ts 顶部附近
+const STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export", "chat"]; // 👈 加上 "chat"
 
 /** 判断是否为有效的步骤名称 */
 function isStepName(step: string): step is StepName {
@@ -99,7 +100,7 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSu
     setIsProcessing(true);
 
     const { abort } = fetchSSE({
-      url: '/chat',
+      url: '/intent/process',
       body: {
         query: text,
         file_ids: files.map(item => item.id),
@@ -205,16 +206,21 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSu
                 // 步骤完成
                 if (existingStepIndex >= 0) {
                   const existingStep = assistantMsg.steps[existingStepIndex];
+                  
+                  // 把流式积攒的文本取出来
+                  const finalContent = (existingStep as any).streamContent;
+
                   const doneStep: DoneStepRecord = {
+                    ...existingStep, // 💡 继承之前的所有属性，包括 streamContent，防止组件报错
                     step,
-                    status: "done",
+                    status: "done" as const, // 断言为字面量类型
                     started_at: existingStep.started_at,
                     completed_at: new Date().toISOString(),
-                    output: output as DoneStepRecord["output"],
+                    // 💡 如果后端有返回 output 就用后端的，如果没有，就把打字机的结果存进 output
+                    output: (output !== undefined ? output : finalContent) as DoneStepRecord["output"],
                   };
+                  
                   assistantMsg.steps[existingStepIndex] = doneStep;
-
-                  // execute 步骤完成时的处理已在上方通过 onExecuteSuccess 回调处理
                 }
                 break;
               }

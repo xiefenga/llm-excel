@@ -436,8 +436,17 @@ export async function getThreads(): Promise<ThreadListItem[]> {
   }
 }
 
-// 获取线程详情
+// 获取线程详情(xxx: 这里新增了对 "null" 和 "undefined" 字符串的拦截，防止后端收到无效的 threadId)
 export async function getThreadDetail(threadId: string): Promise<ThreadDetail> {
+  // 👇 新增拦截逻辑：防止把 "null" 或 "undefined" 发给后端
+  if (!threadId || threadId === "null" || threadId === "undefined") {
+    console.warn("拦截请求: 暂无 threadId，跳过拉取历史记录");
+    // 这里建议抛出一个特定的错误或者返回一个空结构，取决于你外层调用的 try/catch 怎么处理
+    // 简单点的话，可以直接 throw
+    throw new Error("NO_THREAD_ID"); 
+  }
+  // 👆 拦截结束
+
   try {
     const res = await axios.get<ApiResponse<ThreadDetail>>(`${API_BASE}/threads/${threadId}`);
     if (res.data.code !== 0) {
@@ -507,36 +516,71 @@ interface ProcessPromise extends Promise<void> {
   abort: () => void;
 }
 
-
 export const processExcel = ({ body, events: { onStart, onMessage, onError, onSuccess, onFinally } }: ProcessExcelOptions) => {
   const controller = new AbortController();
 
   const trigger = async () => {
     try {
-      const res = await fetch(`${API_BASE}/excel/chat`, {
+      onStart?.();
+
+      // 1. 先调用统一入口，获取意图分析结果 (JSON格式)
+      const intentRes = await fetch(`${API_BASE}/intent/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
 
-      onStart?.();
-
-      if (!res.ok) {
-        throw new Error("请求失败");
+      if (!intentRes.ok) {
+        throw new Error("意图识别请求失败");
       }
 
-      for await (const event of events(res, controller.signal)) {
-        if (!event.data) {
-          continue;
-        }
-        try {
-          const data = JSON.parse(event.data);
-          onMessage?.(data as SSEMessage);
-        } catch {
-          // ignore parse errors
-        }
+      const intentData = await intentRes.json();
+
+      // 2. 判断是否需要澄清
+      if (intentData.requires_clarification && intentData.clarification_question) {
+        // 伪装成一次普通的回复，让前端 UI 能够渲染出大模型的反问
+        onMessage?.({
+          action: "generate", 
+          status: "done",
+          data: { message: intentData.clarification_question }
+        });
+        onSuccess?.();
+        return; // 流程结束，等待用户下一次输入
       }
+
+      // 3. 如果不需要澄清，且意图是数据处理 (走原来的 Excel 处理逻辑)
+      if (intentData.intent === "processing" && intentData.processing_route) {
+        // 这里请求后端返回的真实处理路由，建立真正的 SSE 流！
+        const streamRes = await fetch(`${API_BASE}${intentData.processing_route}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!streamRes.ok) throw new Error("处理流请求失败");
+
+        // 解析真正的 SSE 流
+        for await (const event of events(streamRes, controller.signal)) {
+          if (!event.data) continue;
+          try {
+            const data = JSON.parse(event.data);
+            onMessage?.(data as SSEMessage);
+          } catch {
+            // ignore parse errors
+          }
+        }
+      } 
+      // 4. 其他意图（如纯聊天、数据分析），以后可以在这里扩展
+      else {
+         onMessage?.({
+            action: "generate",
+            status: "done",
+            data: { message: "开发中：路由到 " + intentData.intent }
+         });
+      }
+
       onSuccess?.();
     } catch (err) {
       const error = err as Error;
@@ -549,9 +593,54 @@ export const processExcel = ({ body, events: { onStart, onMessage, onError, onSu
   }
 
   const process: ProcessPromise = trigger() as ProcessPromise;
-
   process.abort = () => controller.abort();
-
   return process;
+
 }
 
+// export const processExcel = ({ body, events: { onStart, onMessage, onError, onSuccess, onFinally } }: ProcessExcelOptions) => {
+//   const controller = new AbortController();
+
+//   const trigger = async () => {
+//     try {
+//       const res = await fetch(`${API_BASE}/intent/process`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify(body),
+//         signal: controller.signal,
+//       });
+
+//       onStart?.();
+
+//       if (!res.ok) {
+//         throw new Error("请求失败");
+//       }
+
+//       for await (const event of events(res, controller.signal)) {
+//         if (!event.data) {
+//           continue;
+//         }
+//         try {
+//           const data = JSON.parse(event.data);
+//           onMessage?.(data as SSEMessage);
+//         } catch {
+//           // ignore parse errors
+//         }
+//       }
+//       onSuccess?.();
+//     } catch (err) {
+//       const error = err as Error;
+//       if (error.name !== "AbortError") {
+//         onError?.(error);
+//       }
+//     } finally {
+//       onFinally?.();
+//     }
+//   }
+
+//   const process: ProcessPromise = trigger() as ProcessPromise;
+
+//   process.abort = () => controller.abort();
+
+//   return process;
+// }

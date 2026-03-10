@@ -1,23 +1,23 @@
 // ========== 用户消息类型 ==========
 export interface UserMessageAttachment {
-  id: string
-  filename: string
-  path: string
+  id: string;
+  filename: string;
+  path: string;
 }
 
 export interface UserMessage {
   id: string;
   role: "user";
   content: string;
-  files?: UserMessageAttachment[]
-  created: number
-  avatar: string
+  files?: UserMessageAttachment[];
+  created: number;
+  avatar: string;
 }
 
 // ========== Step 类型定义（对齐 SSE_SPEC 和 STEPS_STORAGE_SPEC）==========
 
-/** 步骤名称 */
-export type StepName = "load" | "generate" | "validate" | "execute" | "export";
+/** 步骤名称 (新增 "chat" 步骤) */
+export type StepName = "load" | "generate" | "validate" | "execute" | "export" | "chat";
 
 /** 步骤状态 */
 export type StepStatus = "running" | "streaming" | "done" | "error";
@@ -89,13 +89,17 @@ export interface ExportStepOutput {
   output_files: OutputFileInfo[];
 }
 
-/** 步骤 Output 类型映射 */
+/** chat 步骤输出 (新增，兼容纯字符串或对象) */
+export type ChatStepOutput = string | Record<string, unknown>;
+
+/** 步骤 Output 类型映射 (新增 chat 映射) */
 export type StepOutputMap = {
   load: LoadStepOutput;
   generate: GenerateStepOutput;
   validate: ValidateStepOutput;
   execute: ExecuteStepOutput;
   export: ExportStepOutput;
+  chat: ChatStepOutput;
 };
 
 // ========== Step 记录类型（存储格式）==========
@@ -187,8 +191,8 @@ export type Message = UserMessage | AssistantMessage;
 
 // ========== 工具函数类型 ==========
 
-/** 有效的步骤名称列表 */
-const VALID_STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export"];
+/** 有效的步骤名称列表 (新增 "chat") */
+const VALID_STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export", "chat"];
 
 /** 获取每个步骤的最终状态 */
 export function getLatestSteps(steps: StepRecord[]): Partial<Record<StepName, StepRecord>> {

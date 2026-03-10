@@ -1,4 +1,4 @@
-"""Excel 智能处理接口"""
+"""Excel 数据处理接口 - 专门处理数据处理意图"""
 
 import asyncio
 import json
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ============ SSE 事件辅助函数（chat.py 特有）============
+# ============ SSE 事件辅助函数（data_processing.py 特有）============
 
 
 class ErrorCode:
@@ -84,15 +84,20 @@ class ChatRequest(BaseModel):
 
 
 @router.post(
-    "/chat",
-    description="使用自然语言描述数据处理需求，LLM 会自动理解并执行相应操作。",
+    "/processing",
+    description="处理数据处理意图的请求，执行Excel数据操作。",
 )
-async def process_excel_chat(
+async def process_data_processing(
     params: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
+    # ================= 加上下面这一行 =================
+    logger.info(f"🚀 [进入 Processing 接口] 收到请求: query='{params.query}', file_ids={params.file_ids}, user_id={current_user.id}")
+    # ===============================================
     """
-    使用 LLM 智能处理 Excel 数据（SSE 流式响应）
+    处理数据处理意图的请求（SSE 流式响应）
+
+    这是专门处理数据处理意图的端点，接收来自意图识别模块的路由请求。
 
     SSE 事件协议:
     - event: session  - 会话元数据（thread/turn 创建完成）

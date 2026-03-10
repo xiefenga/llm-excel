@@ -118,6 +118,8 @@ class TurnRepository:
         thread_id: UUID,
         turn_number: int,
         user_query: str,
+        intent_type: Optional[str] = None,
+        response_text: Optional[str] = None,
     ) -> ThreadTurn:
         """
         创建新的 turn
@@ -126,6 +128,8 @@ class TurnRepository:
             thread_id: 线程 ID
             turn_number: turn 序号
             user_query: 用户查询
+            intent_type: 意图类型（可选）
+            response_text: AI 回复文本（可选）
 
         Returns:
             新创建的 ThreadTurn 对象
@@ -136,6 +140,8 @@ class TurnRepository:
             turn_number=turn_number,
             user_query=user_query,
             status="pending",
+            intent_type=intent_type,
+            response_text=response_text,
             steps=[],
         )
         self.db.add(turn)
