@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useImperativeHandle, useCallback } from 'react'
 import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock } from 'lucide-react'
 
 import { Button } from '~/components/ui/button'
@@ -11,6 +11,7 @@ import { StepItem } from '~/components/step-item'
 import ExcelPreview from '~/components/excel-preview'
 import InsightCard from '~/components/insight-card'
 import ExcelIcon from '~/assets/iconify/vscode-icons/file-type-excel.svg?react'
+import { Streamdown } from 'streamdown'
 
 import { cn } from '~/lib/utils'
 
@@ -98,6 +99,12 @@ export interface ChatPanelProps {
   // ========== UI 配置 ==========
   /** 用户头像 */
   userAvatar?: string
+  /** ref handle */
+  ref?: React.Ref<ChatPanelHandle>
+}
+
+export interface ChatPanelHandle {
+  scrollToBottom: () => void
 }
 
 /** 计算步骤耗时 */
@@ -140,6 +147,7 @@ const ChatPanel = ({
   selectedHistoryFiles = [],
   onToggleHistoryFile,
   userAvatar,
+  ref,
 }: ChatPanelProps) => {
   const {
     fileItems,
@@ -150,6 +158,36 @@ const ChatPanel = ({
   } = fileUpload
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null)
+
+  // ========== 自动滚动 ==========
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const isSticky = useRef(true)
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    isSticky.current = true
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight })
+    })
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50
+    isSticky.current = atBottom
+  }, [])
+
+  // 暴露 scrollToBottom 给父组件
+  useImperativeHandle(ref, () => ({ scrollToBottom }), [scrollToBottom])
+
+  // 流式响应期间，sticky 时跟随滚动
+  useEffect(() => {
+    if (isProcessing && isSticky.current) {
+      scrollToBottom()
+    }
+  }, [turns, isProcessing, scrollToBottom])
 
   // 是否为空对话（无历史轮次）
   const isEmptyConversation = turns.length === 0
@@ -176,7 +214,7 @@ const ChatPanel = ({
   return (
     <div className="h-full flex flex-col bg-linear-to-br from-slate-50 via-white to-brand-muted/20">
       {/* 滚动内容区 */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         <div className="p-5 space-y-4">
           {/* 欢迎信息（仅在空对话且无上传文件时显示） */}
           {isEmptyConversation && fileItems.length === 0 && (
@@ -308,21 +346,25 @@ const TurnRenderer = ({
                 // ==========================================
                 if (record.step === 'chat') {
                   let content = '';
-                  // 巧妙利用 as any 绕过 TypeScript 对联合类型的严格检查
                   if (record.status === 'streaming') {
                     content = (record as any).streamContent || '';
                   } else if (record.status === 'done') {
                     content = (record as any).output || '';
                   }
 
+                  const isStreaming = record.status === 'streaming';
+
                   return (
-                    <div 
-                      key={`${record.step}-${index}`} 
-                      className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap py-2 px-1"
+                    <div
+                      key={`${record.step}-${index}`}
+                      className="text-sm text-gray-800 leading-relaxed py-2 px-1"
                     >
-                      {typeof content === 'string' ? content : ''}
-                      {/* 流式输出时显示一个闪烁的光标 */}
-                      {record.status === 'streaming' && <span className="animate-pulse">_</span>}
+                      <Streamdown
+                        mode={isStreaming ? 'streaming' : 'static'}
+                        caret={isStreaming ? 'block' : undefined}
+                      >
+                        {typeof content === 'string' ? content : ''}
+                      </Streamdown>
                     </div>
                   );
                 }

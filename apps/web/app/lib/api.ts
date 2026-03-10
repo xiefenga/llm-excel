@@ -298,6 +298,8 @@ export interface ThreadTurn {
   turn_number: number;
   user_query: string;
   status: string;
+  intent_type?: string | null;
+  response_text?: string | null;
   /** 步骤数组（核心数据） */
   steps: ThreadTurnStep[];
   created_at: string;

@@ -10,7 +10,7 @@ import { useFileUpload } from '~/hooks/use-file-upload'
 
 import { getThreadDetail } from '~/lib/api'
 
-import ChatPanel from './chat-panel'
+import ChatPanel, { type ChatPanelHandle } from './chat-panel'
 import PreviewPanel from './preview-panel'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '~/components/ui/resizable'
 import {
@@ -46,6 +46,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
   const lastLoadedThreadId = useRef<string | undefined>(undefined)
   // 用于标记是否正在开启新会话（避免 useEffect 重复清空）
   const isStartingNewSession = useRef(false)
+  const chatRef = useRef<ChatPanelHandle>(null)
 
   // 任务状态
   const [taskState, setTaskState] = useState<'idle' | 'processing' | 'done' | 'error'>('idle')
@@ -178,7 +179,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
         } satisfies UserMessage)
 
         // 添加助手消息
-        const turnSteps = (turn.steps || []).map((step) => {
+        let turnSteps = (turn.steps || []).map((step) => {
           const baseStep = {
             step: step.step as StepName,
             started_at: step.started_at,
@@ -196,6 +197,17 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
           }
           return { ...baseStep, status: 'running' as const }
         }) as StepRecord[]
+
+        // Chat 轮次：steps 为空但有 response_text，构造 chat step 用于渲染
+        if (turnSteps.length === 0 && turn.response_text) {
+          turnSteps = [{
+            step: 'chat' as StepName,
+            status: 'done' as const,
+            started_at: turn.created_at,
+            completed_at: turn.completed_at ?? turn.created_at,
+            output: turn.response_text,
+          } as StepRecord]
+        }
 
         // 判断助手消息状态
         let assistantStatus: AssistantMessage['status'] = 'done'
@@ -240,6 +252,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
       }
 
       setMessages(loadedMessages)
+      requestAnimationFrame(() => chatRef.current?.scrollToBottom())
     }
   })
 
@@ -309,6 +322,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
     setQuery('')
     // 清空已上传的文件（下一轮需要重新上传或选择历史文件）
     fileUpload.clearFiles()
+    chatRef.current?.scrollToBottom()
   }
 
   // 提交任务
@@ -426,6 +440,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
         {/* 右侧：对话面板 */}
         <ResizablePanel defaultSize={40} minSize={30}>
           <ChatPanel
+            ref={chatRef}
             turns={turns}
             query={query}
             fileUpload={fileUpload}

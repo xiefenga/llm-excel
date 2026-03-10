@@ -145,6 +145,8 @@ async def get_thread_detail(thread_id: str, current_user: User = Depends(get_cur
                 "turn_number": turn.turn_number,
                 "user_query": turn.user_query,
                 "status": turn.status,
+                "intent_type": turn.intent_type,
+                "response_text": turn.response_text,
                 "steps": steps,  # 返回完整的步骤数组，便于前端渲染
                 "created_at": turn.created_at.isoformat(),
                 "completed_at": turn.completed_at.isoformat() if turn.completed_at else None,
