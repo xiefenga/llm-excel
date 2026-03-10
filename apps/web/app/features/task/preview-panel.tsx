@@ -184,7 +184,7 @@ const PreviewPanel = ({
                   )}
                 >
                   <ExcelIcon className="w-3.5 h-3.5" />
-                  <span className="max-w-[120px] truncate">{file.filename}</span>
+                  <span className="max-w-30 truncate">{file.filename}</span>
                 </button>
               ))}
             </div>
@@ -226,7 +226,7 @@ const PreviewPanel = ({
                   )}
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span className="max-w-[120px] truncate">{file.filename}</span>
+                  <span className="max-w-30 truncate">{file.filename}</span>
                 </button>
               ))}
             </div>

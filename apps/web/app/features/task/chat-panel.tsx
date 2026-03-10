@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { useState, useMemo, useRef, useEffect, useImperativeHandle, useCallback } from 'react'
-import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock } from 'lucide-react'
+import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock, Loader2 } from 'lucide-react'
 
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
@@ -232,12 +232,12 @@ const ChatPanel = ({
           )}
 
           {/* 多轮对话渲染 */}
-          {turns.map((turn) => (
+          {turns.map((turn, index) => (
             <TurnRenderer
               key={turn.id}
               turn={turn}
               userAvatar={userAvatar}
-              isActive={turn.id === activeTurnId}
+              isActive={isProcessing && index === turns.length - 1}
               onRetry={onRetry}
             />
           ))}
@@ -308,6 +308,19 @@ const TurnRenderer = ({
     return executeStep?.output as ExecuteStepOutput | null
   }, [assistantMessage])
 
+  // 是否处于等待响应状态（已发送消息，但 AI 尚未开始返回可见内容）
+  const isWaitingResponse = isActive && (
+    !assistantMessage ||
+    assistantMessage.steps.length === 0 ||
+    // chat 步骤已创建但尚无实际文本（等待 LLM 首个 token）
+    (assistantMessage.steps.length > 0 && assistantMessage.steps.every(s =>
+      s.step === 'chat' && (
+        s.status === 'running' ||
+        (s.status === 'streaming' && !(s as any).streamContent)
+      )
+    ))
+  )
+
   // 状态判断
   const hasSteps = assistantMessage && assistantMessage.steps.length > 0
   const isAllDone = assistantMessage?.status === 'done' && hasSteps
@@ -333,6 +346,19 @@ const TurnRenderer = ({
         timestamp={userMessage.timestamp}
         avatar={userAvatar}
       />
+
+      {/* 等待响应 loading */}
+      {isWaitingResponse && (
+        <div className="flex items-center gap-2.5 py-3 px-1">
+          <Loader2 className="w-4 h-4 text-brand animate-spin" />
+          <span className="text-sm text-gray-500">正在思考</span>
+          <span className="flex gap-0.5">
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
+          </span>
+        </div>
+      )}
 
       {/* AI 响应 */}
       {assistantMessage && (
