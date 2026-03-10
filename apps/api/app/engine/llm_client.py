@@ -66,25 +66,52 @@ class LLMClient:
             extra_params=extra_params,
         )
 
-    def call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
-        """对外公开的 LLM 调用（非流式）"""
-        return self._call_llm(stage, system_prompt, user_message)
+    def call_llm(
+        self,
+        stage: str,
+        system_prompt: str,
+        user_message: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """对外公开的 LLM 调用（非流式）
 
-    def _call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
+        两种使用方式：
+        1. 简单模式：传 user_message，自动组装为 [system, user]
+        2. 多轮模式：传 messages（不含 system），自动在前面加 system
+        """
+        return self._call_llm(stage, system_prompt, user_message, messages)
+
+    def _call_llm(
+        self,
+        stage: str,
+        system_prompt: str,
+        user_message: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
         """
         调用 LLM
 
         Args:
+            stage: 阶段名称
             system_prompt: 系统提示词
-            user_message: 用户消息
+            user_message: 用户消息（简单场景）
+            messages: 完整消息列表，不含 system（多轮对话场景）
 
         Returns:
             LLM 响应内容
         """
-
         stage_config = self._resolve_stage_config(stage)
         provider = stage_config.provider
         model = stage_config.model
+
+        # 构建消息列表
+        if messages:
+            full_messages = [{"role": "system", "content": system_prompt}] + messages
+        else:
+            full_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
 
         log_msg = (
             "\n"
@@ -92,20 +119,16 @@ class LLMClient:
             f"[阶段] {stage}\n"
             f"[Provider] {provider.name} ({provider.type})\n"
             f"[模型] {model.model_id}\n"
+            f"[消息数] {len(full_messages)}\n"
             "[System Prompt]\n"
             f"{system_prompt}\n"
-            "[User Message]\n"
-            f"{user_message}\n"
         )
+        for i, msg in enumerate(full_messages[1:], 1):
+            log_msg += f"[{msg['role'].upper()} #{i}]\n{msg['content']}\n"
 
         logger.info(log_msg)
 
-        messages = [
-            { "role": "system", "content": system_prompt },
-            { "role": "user", "content": user_message }
-        ]
-
-        request = self._build_request(stage_config, messages)
+        request = self._build_request(stage_config, full_messages)
         adapter = self.provider_registry.get_adapter(provider)
         response = adapter.complete(request)
         result = response.content.strip()

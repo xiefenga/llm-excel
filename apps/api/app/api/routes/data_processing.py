@@ -1,38 +1,28 @@
 """Excel 数据处理接口 - 专门处理数据处理意图"""
 
-import asyncio
-import json
 import logging
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sse_starlette.sse import EventSourceResponse, ServerSentEvent
+from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import get_llm_client, get_current_user
-from app.core.sse import sse
-from app.engine import FileCollection
-from app.models.btrack import BTrack
-from app.processor.prompt import build_initial_user_message
-from app.services.processor_stream import (
-    stream_excel_processing,
-    StageContext,
-)
+from app.api.deps import get_current_user
 from app.core.database import AsyncSessionLocal
-from app.engine.step_tracker import StepTracker
+from app.core.sse import sse
 from app.models.user import User
-from app.persistence import TurnRepository
-from app.processor import EventType
-from app.services.excel import get_files_by_ids_from_db, load_tables_from_files
-from app.services.thread import generate_thread_title
+from app.services.processing_pipeline import stream_processing_pipeline
+
+# 兼容性 re-export（intent.py 曾 import _init_session）
+from app.services.processing_pipeline import init_session as _init_session  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-# ============ SSE 事件辅助函数（data_processing.py 特有）============
+# ============ Error Codes ============
 
 
 class ErrorCode:
@@ -42,29 +32,6 @@ class ErrorCode:
     FILE_NOT_FOUND = "FILE_NOT_FOUND"
     INVALID_PARAMS = "INVALID_PARAMS"
     INTERNAL_ERROR = "INTERNAL_ERROR"
-
-
-def sse_session(
-    thread_id: str,
-    turn_id: str,
-    title: str,
-    is_new_thread: bool,
-) -> ServerSentEvent:
-    """创建 session 事件"""
-    return sse(
-        {
-            "thread_id": thread_id,
-            "turn_id": turn_id,
-            "title": title,
-            "is_new_thread": is_new_thread,
-        },
-        event="session",
-    )
-
-
-def sse_session_error(code: str, message: str) -> ServerSentEvent:
-    """创建会话级错误事件"""
-    return sse({"code": code, "message": message}, event="error")
 
 
 # ============ Request Model ============
@@ -83,226 +50,49 @@ class ChatRequest(BaseModel):
 # ============ API Endpoint ============
 
 
-@router.post(
-    "/processing",
-    description="处理数据处理意图的请求，执行Excel数据操作。",
-)
+@router.post("/processing")
 async def process_data_processing(
     params: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
-    # ================= 加上下面这一行 =================
-    logger.info(f"🚀 [进入 Processing 接口] 收到请求: query='{params.query}', file_ids={params.file_ids}, user_id={current_user.id}")
-    # ===============================================
+    logger.info(
+        f"🚀 [进入 Processing 接口] 收到请求: query='{params.query}', "
+        f"file_ids={params.file_ids}, user_id={current_user.id}"
+    )
     """
     处理数据处理意图的请求（SSE 流式响应）
-
-    这是专门处理数据处理意图的端点，接收来自意图识别模块的路由请求。
 
     SSE 事件协议:
     - event: session  - 会话元数据（thread/turn 创建完成）
     - event: error    - 会话级/系统级错误
     - (default)       - 业务流程步骤 { step, status, delta/output/error }
-
-    业务流程步骤:
-    - load:file: 加载文件 → { files }
-    - analyze: 需求分析 → { content }
-    - generate: 生成操作 → { operations }
-    - execute: 执行操作 → { formulas, ... }
-    - export:result: 导出结果 → { output_files }
-    - complete: 流程结束 → { success, errors }
     """
-    # 1. 参数验证和转换
+    # 参数验证和转换
     try:
         file_ids = [UUID(fid) for fid in params.file_ids]
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"无效的 file_id 格式: {e}")
 
-    thread_id = None
+    thread_id: Optional[UUID] = None
     if params.thread_id:
         try:
             thread_id = UUID(params.thread_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的 thread_id 格式")
 
-    # 2. 创建流式响应
     async def stream():
         async with AsyncSessionLocal() as db:
-            repo = TurnRepository(db)
-            tracker = StepTracker()
-
-            # === 会话初始化 ===
             try:
-                session_result = await _init_session(
-                    repo, current_user.id, params.query, file_ids, thread_id
-                )
-                if session_result.get("error"):
-                    yield sse_session_error(
-                        session_result["error"]["code"],
-                        session_result["error"]["message"],
-                    )
-                    return
-
-                yield sse_session(
-                    session_result["thread_id"],
-                    session_result["turn_id"],
-                    session_result["title"],
-                    session_result["is_new_thread"],
-                )
-
-                turn_id = UUID(session_result["turn_id"])
-                actual_thread_id = UUID(session_result["thread_id"])
-
+                async for event in stream_processing_pipeline(
+                    db=db,
+                    user_id=current_user.id,
+                    query=params.query,
+                    file_ids=file_ids,
+                    thread_id=thread_id,
+                ):
+                    yield event
             except Exception as e:
-                logger.exception(f"Session init error: {e}")
-                yield sse_session_error(ErrorCode.INTERNAL_ERROR, f"初始化会话失败: {e}")
-                return
-
-            # === Excel 处理流程（使用公共模块）===
-            # 标记处理中
-            await repo.mark_processing(turn_id, tracker)
-
-            # 事件回调：处理持久化
-            async def on_event(ctx: StageContext):
-                if ctx.event_type == EventType.STAGE_START:
-                    tracker.start(ctx.step)
-                elif ctx.event_type == EventType.STAGE_DONE:
-                    tracker.done(ctx.step, ctx.output)
-                    await repo.save_steps(turn_id, tracker)
-                elif ctx.event_type == EventType.STAGE_ERROR:
-                    tracker.error(ctx.step, "STEP_ERROR", ctx.error)
-                    await repo.mark_failed(turn_id, tracker)
-                    await repo.commit()
-
-            # 加载文件的函数
-            async def load_tables():
-                files = await get_files_by_ids_from_db(db, file_ids, current_user.id)
-                return await asyncio.to_thread(load_tables_from_files, files)
-
-            process_with_errors = False
-            process_errors = []
-
-            async def on_failure(errors: List[str]):
-                nonlocal process_errors
-                process_errors.extend(errors)
-                nonlocal process_with_errors
-                process_with_errors = True
-
-            file_collection: Optional[FileCollection] = None
-
-            async def on_load_tables(tables: FileCollection):
-                nonlocal file_collection
-                file_collection = tables
-
-            # 执行处理流程
-            async for sse_event in stream_excel_processing(
-                load_tables_fn=load_tables,
-                query=params.query,
-                stream_llm=True,
-                export_path_prefix=f"users/{current_user.id}/outputs",
-                on_event=on_event,
-                on_failure=on_failure,
-                on_load_tables=on_load_tables,
-            ):
-                yield sse_event
-
-            # === 完成 ===
-            await repo.mark_completed(turn_id, actual_thread_id, tracker)
-            await repo.commit()
-
-            if process_with_errors:
-                db.add(
-                    BTrack(
-                        reporter_id=current_user.id,
-                        steps=tracker.to_list(),
-                        errors=json.dumps(process_errors, ensure_ascii=False),
-                        thread_turn_id=turn_id,
-                        generation_prompt=build_initial_user_message(params.query,  file_collection.get_schemas_with_samples(sample_count=3))
-                    )
-                )
-                await db.commit()
+                logger.error(f"处理请求流失败: {e}", exc_info=True)
+                yield sse({"message": f"处理失败: {str(e)}"}, event="error")
 
     return EventSourceResponse(stream())
-
-
-# ============ Helper Functions ============
-
-
-async def _init_session(
-    repo: TurnRepository,
-    user_id: UUID,
-    query: str,
-    file_ids: List[UUID],
-    thread_id: Optional[UUID],
-    parent_turn_id: Optional[UUID] = None,
-    context_snapshot: Optional[dict] = None,
-) -> dict:
-    """
-    初始化会话
-
-    创建或获取 Thread，创建 Turn，关联文件。
-
-    Args:
-        repo: TurnRepository实例
-        user_id: 用户ID
-        query: 用户查询
-        file_ids: 文件ID列表
-        thread_id: 线程ID（可选）
-        parent_turn_id: 父轮次ID（可选，用于对话链）
-        context_snapshot: 上下文快照（可选）
-
-    Returns:
-        {
-            "thread_id": str,
-            "turn_id": str,
-            "title": str,
-            "is_new_thread": bool,
-            "error": Optional[{"code": str, "message": str}]
-        }
-    """
-    is_new_thread = False
-    title = ""
-
-    # 获取或创建线程
-    if thread_id:
-        thread = await repo.get_thread(thread_id, user_id)
-        if not thread:
-            return {
-                "error": {
-                    "code": ErrorCode.THREAD_NOT_FOUND,
-                    "message": "线程不存在或无权访问",
-                }
-            }
-        title = thread.title or ""
-    else:
-        # 创建新线程
-        llm_client = await get_llm_client(repo.db)
-        title = await asyncio.to_thread(generate_thread_title, query, llm_client)
-        thread = await repo.create_thread(user_id, title)
-        thread_id = thread.id
-        is_new_thread = True
-
-    # 创建 turn（支持父轮次ID和上下文快照）
-    turn_number = await repo.get_next_turn_number(thread_id)
-    turn = await repo.create_turn(
-        thread_id=thread_id,
-        turn_number=turn_number,
-        user_query=query,
-        parent_turn_id=parent_turn_id,
-        context_snapshot=context_snapshot,
-    )
-
-    # 关联文件
-    try:
-        await repo.link_files_to_turn(turn.id, file_ids, user_id)
-    except ValueError as e:
-        return {"error": {"code": ErrorCode.FILE_NOT_FOUND, "message": str(e)}}
-
-    await repo.commit()
-
-    return {
-        "thread_id": str(thread_id),
-        "turn_id": str(turn.id),
-        "title": title,
-        "is_new_thread": is_new_thread,
-    }

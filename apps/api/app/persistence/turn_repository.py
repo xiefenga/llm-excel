@@ -71,23 +71,34 @@ class TurnRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def get_thread_turns(self, thread_id: UUID, limit: int = 10) -> List[ThreadTurn]:
+    async def get_thread_turns(
+        self,
+        thread_id: UUID,
+        limit: Optional[int] = None,
+        with_files: bool = False,
+    ) -> List[ThreadTurn]:
         """
         获取线程的历史对话轮次
 
         Args:
             thread_id: 线程 ID
-            limit: 返回的最大轮次数
+            limit: 返回的最大轮次数，None 表示不限
+            with_files: 是否 eager load 关联文件
 
         Returns:
             按轮次倒序排列的 ThreadTurn 列表（最新的在前）
         """
+        from sqlalchemy.orm import selectinload
+
         stmt = (
             select(ThreadTurn)
             .where(ThreadTurn.thread_id == thread_id)
             .order_by(ThreadTurn.turn_number.desc())
-            .limit(limit)
         )
+        if with_files:
+            stmt = stmt.options(selectinload(ThreadTurn.files))
+        if limit is not None:
+            stmt = stmt.limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 

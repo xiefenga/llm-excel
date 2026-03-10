@@ -526,7 +526,7 @@ export const processExcel = ({ body, events: { onStart, onMessage, onError, onSu
       onStart?.();
 
       // 1. 先调用统一入口，获取意图分析结果 (JSON格式)
-      const intentRes = await fetch(`${API_BASE}/intent/process`, {
+      const intentRes = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -605,7 +605,7 @@ export const processExcel = ({ body, events: { onStart, onMessage, onError, onSu
 
 //   const trigger = async () => {
 //     try {
-//       const res = await fetch(`${API_BASE}/intent/process`, {
+//       const res = await fetch(`${API_BASE}/chat`, {
 //         method: "POST",
 //         headers: { "Content-Type": "application/json" },
 //         body: JSON.stringify(body),

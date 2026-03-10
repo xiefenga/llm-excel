@@ -100,7 +100,7 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSu
     setIsProcessing(true);
 
     const { abort } = fetchSSE({
-      url: '/intent/process',
+      url: '/chat',
       body: {
         query: text,
         file_ids: files.map(item => item.id),

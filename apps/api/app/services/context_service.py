@@ -168,9 +168,9 @@ class ContextService:
             turn_dict["files"] = [
                 {
                     "id": str(file.id),
-                    "name": file.name,
-                    "size": file.size,
-                    "type": file.type
+                    "name": file.filename,
+                    "size": file.file_size,
+                    "type": file.mime_type
                 }
                 for file in turn.files
             ]
@@ -314,7 +314,7 @@ class ContextService:
                     for file in turn.files:
                         context["file_analysis_history"].append({
                             "file_id": str(file.id),
-                            "file_name": file.name,
+                            "file_name": file.filename,
                             "analysis_turn": turn.turn_number,
                             "analysis_time": turn.completed_at.isoformat() if turn.completed_at else None
                         })
@@ -393,9 +393,9 @@ class ContextService:
                 for file in turn.files:
                     file_info = {
                         "id": str(file.id),
-                        "name": file.name,
-                        "type": file.type,
-                        "size": file.size,
+                        "name": file.filename,
+                        "type": file.mime_type,
+                        "size": file.file_size,
                         "source_turn": turn.turn_number,
                         "is_output": self._is_output_file(turn, file.id)
                     }

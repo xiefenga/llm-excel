@@ -7,6 +7,7 @@ from uuid import UUID
 from app.engine.intent_classifier import IntentClassifier, IntentType
 from app.core.database import AsyncSessionLocal
 from app.api.deps import get_llm_client
+from app.persistence import TurnRepository
 
 logger = logging.getLogger(__name__)
 
@@ -57,61 +58,50 @@ class IntentService:
             - context: 上下文信息
         """
         try:
-            # =======================================================
-            # 💡 核心修复 1&2：继承历史文件 + 提取历史对话给分类器
-            # =======================================================
-            history_text = ""
+            # === 加载历史对话 + 继承文件 ===
+            history_messages: List[Dict] = []
             if thread_id and db_session:
-                from sqlalchemy import select
-                from sqlalchemy.orm import selectinload
-                from app.models.thread import ThreadTurn
-                from uuid import UUID
-                
                 try:
-                    stmt = (
-                        select(ThreadTurn)
-                        .where(ThreadTurn.thread_id == UUID(thread_id))
-                        .order_by(ThreadTurn.turn_number.desc())
-                        .options(selectinload(ThreadTurn.files))
-                        .limit(5)
+                    repo = TurnRepository(db_session)
+                    thread_uuid = UUID(thread_id)
+
+                    # 获取全部历史轮次（带文件关联，用于文件继承）
+                    recent_turns = await repo.get_thread_turns(
+                        thread_uuid, with_files=True
                     )
-                    result = await db_session.execute(stmt)
-                    recent_turns = result.scalars().all()
-                    
-                    # 1. 继承文件 (只有当前没传文件时才继承)
+
+                    # 1. 继承文件（只有当前没传文件时才继承）
                     if not file_ids:
                         for turn in recent_turns:
                             if turn.files:
                                 file_ids = [str(f.id) for f in turn.files]
-                                logger.info(f"🔄 从历史对话(turn={turn.turn_number})中自动继承了 {len(file_ids)} 个文件")
+                                logger.info(
+                                    f"🔄 从历史对话(turn={turn.turn_number})"
+                                    f"中自动继承了 {len(file_ids)} 个文件"
+                                )
                                 break
-                    
-                    # 2. 提取历史对话作为分类器的记忆
-                    if recent_turns:
-                        history_lines = []
-                        # 反转顺序，按时间正序拼接最近3轮
-                        for t in reversed(recent_turns[:3]):
-                            if t.user_query:
-                                history_lines.append(f"用户: {t.user_query}")
-                            if t.response_text:
-                                history_lines.append(f"助手: {t.response_text}")
-                        history_text = "\n".join(history_lines)
-                        
+
+                    # 2. 构建 messages 数组（正序：oldest first）
+                    for t in reversed(recent_turns):
+                        if t.user_query:
+                            history_messages.append({"role": "user", "content": t.user_query})
+                        if t.response_text:
+                            history_messages.append({"role": "assistant", "content": t.response_text})
+
                 except Exception as db_e:
                     logger.warning(f"尝试继承历史文件或获取历史对话失败: {db_e}")
-            # =======================================================
 
             has_files = len(file_ids) > 0
             file_count = len(file_ids)
-            
-            # 调用分类器 (传入我们刚组装好的 history_text)
+
+            # 调用分类器
             classification_result = self.intent_classifier.classify(
                 query=query,
                 has_files=has_files,
                 file_count=file_count,
-                history=history_text  # 👈 新增传参
+                history_messages=history_messages,
             )
-            
+
             # 获取意图类型
             intent = classification_result['intent']
             confidence = classification_result['confidence']
@@ -171,7 +161,7 @@ class IntentService:
         """
         # 如果需要澄清，返回澄清路由
         if requires_clarification:
-            return "/api/intent/clarify"
+            return "/api/chat/clarify"
         
         # 根据意图类型返回相应路由
         if intent == IntentType.CHAT.value:
@@ -181,10 +171,10 @@ class IntentService:
         elif intent == IntentType.PROCESSING.value:
             return "/api/data/processing"
         elif intent == IntentType.UNCLEAR.value:
-            return "/api/intent/clarify"
+            return "/api/chat/clarify"
         else:
             # 未知意图，默认返回澄清路由
-            return "/api/intent/clarify"
+            return "/api/chat/clarify"
     
     async def _build_context(
         self,
@@ -229,7 +219,6 @@ class IntentService:
             # 如果有线程ID，构建完整上下文
             if thread_id:
                 try:
-                    from uuid import UUID
                     thread_uuid = UUID(thread_id)
                     
                     # 构建完整上下文
@@ -280,7 +269,7 @@ class IntentService:
             "confidence": 0.1,
             "requires_clarification": True,
             "clarification_question": f"系统处理出错: {error_msg}。请重新描述您的需求。",
-            "processing_route": "/api/intent/clarify",
+            "processing_route": "/api/chat/clarify",
             "context": {
                 "intent": IntentType.UNCLEAR.value,
                 "thread_id": None,
@@ -370,7 +359,7 @@ class IntentService:
         
         # 检查是否有有效的处理路由
         processing_route = intent_result.get('processing_route', '')
-        if not processing_route or processing_route == '/api/intent/clarify':
+        if not processing_route or processing_route == '/api/chat/clarify':
             return False
         
         return True

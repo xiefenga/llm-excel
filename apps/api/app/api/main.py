@@ -1,19 +1,12 @@
 from fastapi import APIRouter
 
 from app.core.config import settings
-from app.api.routes import intent, chat_conversation, auth, file, thread, btrack, role, user, llm
+from app.api.routes import chat, chat_conversation, auth, file, thread, btrack, role, user, llm
 
 api_router = APIRouter()
 
-# 统一入口：意图识别路由（必须放在最前面）
-api_router.include_router(intent.router, prefix="/intent", tags=["意图识别"])
-
-# 聊天对话路由
-api_router.include_router(chat_conversation.router, prefix="/chat", tags=["聊天对话"])
-
-# 现有路由（保持向后兼容）
-from app.api.routes import data_processing
-api_router.include_router(data_processing.router, prefix="/data", tags=["数据处理"])
+# 统一入口：意图识别 + 聊天路由（必须放在最前面）
+api_router.include_router(chat.router, tags=["聊天"])
 
 api_router.include_router(auth.router, tags=["认证"])
 
