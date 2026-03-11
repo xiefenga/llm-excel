@@ -12,6 +12,7 @@ import { getThreadDetail } from '~/lib/api'
 
 import ChatPanel, { type ChatPanelHandle } from './chat-panel'
 import PreviewPanel from './preview-panel'
+import { getLatestOutputFilesFromTurns } from './history-output-files'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '~/components/ui/resizable'
 import {
   AlertDialog,
@@ -239,16 +240,12 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
       })
 
       // 提取输出文件 - 从 export 步骤获取
-      const lastTurn = thread.turns[thread.turns.length - 1]
-      if (lastTurn) {
-        const exportStep = lastTurn.steps?.find(s => s.step === 'export' && s.status === 'done')
-        if (exportStep?.output) {
-          const output = exportStep.output as unknown as ExportStepOutput
-          if (output.output_files?.length > 0) {
-            setOutputFiles(output.output_files)
-            setTaskState('done')
-          }
-        }
+      const latestOutputFiles = getLatestOutputFilesFromTurns(thread.turns)
+      if (latestOutputFiles.length > 0) {
+        setOutputFiles(latestOutputFiles)
+        setTaskState('done')
+      } else {
+        setOutputFiles([])
       }
 
       setMessages(loadedMessages)
