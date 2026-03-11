@@ -9,6 +9,12 @@ from app.core.database import AsyncSessionLocal
 from app.api.deps import get_llm_client
 from app.persistence import TurnRepository
 
+from sqlalchemy import select
+from app.models.file import File 
+from app.engine.excel_parser import ExcelParser
+import asyncio
+from app.services.excel import get_files_by_ids_from_db, load_tables_from_files
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,13 +37,43 @@ class IntentService:
             intent_classifier: 意图分类器实例
         """
         self.intent_classifier = intent_classifier
-        
+
+    # 新增功能：提取文件表头信息，供分类器使用
+    async def _extract_schema_info(self, file_ids: List[str], db_session: AsyncSessionLocal, user_id: UUID) -> str:
+        """使用数据管线原生的健壮方法提取 Schema"""
+        if not file_ids or not db_session or not user_id:
+            return "无可用表头信息"
+            
+        try:
+            from uuid import UUID
+            uuid_file_ids = [UUID(fid) if isinstance(fid, str) else fid for fid in file_ids]
+            
+            # 复用 processing_pipeline.py 同款的文件读取逻辑（跨越 MinIO 障碍）
+            files = await get_files_by_ids_from_db(db_session, uuid_file_ids, user_id)
+            file_collection = await asyncio.to_thread(load_tables_from_files, files)
+            
+            schema_lines = []
+            for excel_file in file_collection:
+                for sheet_name in excel_file.get_sheet_names():
+                    table = excel_file.get_sheet(sheet_name)
+                    # 提取列名
+                    cols = table.get_columns()
+                    schema_lines.append(f"- 文件 [{excel_file.filename}] 表 [{sheet_name}] 包含列: {', '.join(cols)}")
+                    
+            if schema_lines:
+                return "\n".join(schema_lines)
+            return "当前文件无可用列信息"
+        except Exception as e:
+            logger.warning(f"获取 Schema 失败: {e}")
+            return "无法获取表头信息"
+
     async def recognize_intent(
         self,
         query: str,
         file_ids: List[str],
         thread_id: Optional[str] = None,
-        db_session: Optional[AsyncSessionLocal] = None
+        db_session: Optional[AsyncSessionLocal] = None,
+        user_id: Optional[UUID] = None
     ) -> Dict:
         """
         识别用户意图并返回路由决策
@@ -94,12 +130,18 @@ class IntentService:
             has_files = len(file_ids) > 0
             file_count = len(file_ids)
 
-            # 调用分类器
+            # 获取真实的 Schema
+            schema_info = "当前无文件或无法获取表头信息"
+            if has_files and db_session and user_id:
+                schema_info = await self._extract_schema_info(file_ids, db_session, user_id)
+
+            # 调用分类器（此时分类器已经“重见光明”）
             classification_result = self.intent_classifier.classify(
                 query=query,
                 has_files=has_files,
                 file_count=file_count,
                 history_messages=history_messages,
+                schema_info=schema_info  # 👈 喂给模型
             )
 
             # 获取意图类型

@@ -2,7 +2,7 @@
 
 提供统一的 Excel 处理流程，生成标准化的 SSE 事件流。
 """
-
+import json
 import asyncio
 import logging
 import uuid
@@ -309,6 +309,8 @@ async def stream_excel_processing(
         event_type = event.event_type
         error_msg = getattr(event, "error", None)
 
+        is_intentional_refusal = False
+
         if (
             step_name == "execute"
             and event_type == EventType.STAGE_DONE
@@ -318,6 +320,13 @@ async def stream_excel_processing(
             if errors:
                 event_type = EventType.STAGE_ERROR
                 error_msg = "; ".join(errors) if isinstance(errors, list) else str(errors)
+
+        # 🚨 新增：检查异常是否是我们定制的打断异常
+        if event_type == EventType.STAGE_ERROR and error_msg:
+             # 如果 error_msg 中包含了我们在 llm_client 抛出的原话（或者就是那个 ValueError 的 message）
+             # 这里可以根据实际抛出的内容特征进行判断，通常它是不包含 Python 堆栈的纯自然语言
+             if "请检查需求中的列名是否正确" in error_msg or "请指定要删除的具体列名" in error_msg or "LLM 无法处理" in error_msg or "需求描述不完整" in error_msg:
+                 is_intentional_refusal = True
 
         # 构建上下文并调用回调
         ctx = StageContext(
@@ -343,15 +352,41 @@ async def stream_excel_processing(
             yield sse_step_done(step_name, event.output, stage_id)
 
         elif event_type == EventType.STAGE_ERROR:
-            yield sse_step_error(step_name, error_msg, stage_id)
-            has_error = True
-            # 错误后发送 complete 并终止
-            yield sse_step_done(
-                "complete", {"success": False, "errors": [error_msg]}
-            )
-            if on_failure:
-                await on_failure([error_msg])
-            return
+            # 🌟 核心改造：优雅降级为 Chat
+            if is_intentional_refusal:
+                # 1. 伪装成 Chat 状态发送给前端
+                yield ServerSentEvent(
+                    data=json.dumps({"step": "chat", "status": "running"}),
+                    event="message"
+                )
+                
+                # 2. 模拟打字机效果发送错误原因（反问内容）
+                # 这里为了简化，直接发送完整的 output。前端收到 done 就会渲染在对话框里
+                clean_msg = error_msg.replace("LLM 无法处理:", "").replace("生成操作失败:", "").strip()
+                yield ServerSentEvent(
+                    data=json.dumps({"step": "chat", "status": "done", "output": clean_msg}),
+                    event="message"
+                )
+                
+                # 3. 标记管线结束
+                yield sse_step_done("complete", {"success": False, "errors": [clean_msg]})
+                
+                # 标记错误但不视为系统崩溃
+                has_error = True
+                if on_failure:
+                    await on_failure([clean_msg])
+                return
+
+            else:
+                # 真正的系统崩溃，走原有的 Error 流程
+                yield sse_step_error(step_name, error_msg, stage_id)
+                has_error = True
+                yield sse_step_done(
+                    "complete", {"success": False, "errors": [error_msg]}
+                )
+                if on_failure:
+                    await on_failure([error_msg])
+                return
 
     # === 3. export:result ===
     output_files = None

@@ -110,6 +110,7 @@ async def chat(
                 file_ids=file_ids,
                 thread_id=request.thread_id,
                 db_session=db,
+                user_id=current_user.id  # 👈 新增这一行
             )
             file_ids = intent_result.get("file_ids", file_ids)
 

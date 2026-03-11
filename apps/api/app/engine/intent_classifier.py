@@ -26,19 +26,26 @@ class IntentClassifier:
     历史对话通过 messages 数组传入，而非字符串拼接。
     """
 
-    SYSTEM_PROMPT = """\
-对当前这一轮用户消息做意图分类。参考历史会话判断上下文。
+    # 🌟 优化点1：改为动态模板，注入Schema，并增加严格的隔离指令
+    SYSTEM_PROMPT_TEMPLATE = """\
+你是一个精准的意图分类器。请严格区分【历史对话记录】和用户的【当前最新指令】。历史记录仅作背景参考，你必须仅针对【当前最新指令】做出意图分类判断！
+
+【当前可用文件表头信息 (Schema)】
+{schema_info}
 
 意图类型：
-- chat: 纯聊天，不涉及文件处理
+- chat: 纯聊天，不涉及文件处理（如：日常打招呼“你好”、感谢、询问功能等）。注意：即使历史记录全是在处理数据报错，只要当前指令是聊天，就必须分类为 chat！
 - analysis: 数据分析/总结，不修改数据
 - processing: 数据处理，修改/转换/导出数据
-- unclear: 需求不明确，需要澄清
+- unclear: 需求不明确，或要求操作的列不存在，需要澄清
 
-分类规则：
-1. 无文件 → chat
-2. 有文件 → 根据内容判断 analysis 或 processing
-3. processing 需求不明确时 requires_clarification=true
+分类核心规则（必须绝对遵守）：
+1. 闲聊防误判：如果当前指令是打招呼或闲聊，不管有没有文件，直接判定为 chat！
+2. 上下文意图继承（新规则）：如果用户的【当前最新指令】非常简短（如只提供了一个列名、"是"、"对"、"升序"等），请务必查看最近一条【历史对话记录】。如果用户是在回答系统的提问，或者在更正上一步的列名，请继承历史记录中的操作意图（如排序、筛选等），根据情况判定是processing还是unclear！
+3. 指令完整性校验（关键！）：如果当前指令是数据处理，但缺少必要的参数（例如：只说了“分组”、“合并”，但没说按哪一列分组；只说了“计算平均值”，没说算哪一列），必须判定为 unclear，requires_clarification=true，并在 clarification_question 中温柔地反问用户缺少的信息。
+4. 列名真实性校验（关键！）：如果当前指令要求操作具体的列，你必须核对该列名是否存在于上方的【当前可用文件表头信息】中！
+   - 如果列名不存在：必须判定为 unclear，requires_clarification=true，并在 clarification_question 中明确告诉用户找不到该列，并列出真实可用的列名。
+   - 如果需求完整且列名存在：正常判定为 processing 或 analysis。
 
 严格输出 JSON：
 {"intent":"...","confidence":0.0-1.0,"requires_clarification":true|false,"clarification_question":"...或null","reasoning":"..."}"""
@@ -52,28 +59,26 @@ class IntentClassifier:
         has_files: bool = False,
         file_count: int = 0,
         history_messages: Optional[List[Dict[str, str]]] = None,
+        schema_info: str = "当前无文件或无法获取表头信息"  
     ) -> Dict:
-        """
-        分类用户意图
-
-        Args:
-            query: 用户查询文本
-            has_files: 是否有文件上传
-            file_count: 文件数量
-            history_messages: 历史会话 messages 数组 [{"role":"user","content":"..."},...]
-
-        Returns:
-            分类结果字典
-        """
+        """分类用户意图"""
         try:
-            # 构建 messages: 历史会话 + 当前用户消息
-            current_message = f"[有文件:{file_count}个] {query}" if has_files else f"[无文件] {query}"
+            # 格式化动态 System Prompt
+            system_prompt = self.SYSTEM_PROMPT_TEMPLATE.replace("{schema_info}", schema_info)
 
-            messages = list(history_messages or [])
+            # 🌟 优化点3：实施物理隔离（Boundary Framing）
+            messages = []
+            if history_messages:
+                messages.append({"role": "system", "content": "--- 以下为历史对话记录，仅作为上下文参考，切勿作为当前意图的判断主体 ---"})
+                messages.extend(history_messages)
+                messages.append({"role": "system", "content": "--- 历史对话记录结束 ---"})
+
+            # 强推当前指令，将其变为 LLM 的绝对注意力核心
+            current_message = f"【当前最新指令】(是否有文件: {has_files})\n用户说：{query}"
             messages.append({"role": "user", "content": current_message})
 
             response = self.llm_client.call_llm(
-                "intent", self.SYSTEM_PROMPT, messages=messages
+                "intent", system_prompt, messages=messages
             )
 
             result = self._parse_response(response)
@@ -90,7 +95,7 @@ class IntentClassifier:
             return self._get_default_result(query, has_files)
 
     def _parse_response(self, response: str) -> Dict:
-        """解析LLM响应"""
+        """解析LLM响应 (保持原样)"""
         try:
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
@@ -145,20 +150,25 @@ class IntentClassifier:
             result['clarification_question'] = "数据分析或处理需要上传文件，请先上传相关文件。"
             result['reasoning'] += " (修正: 无文件时不能进行数据分析或处理)"
 
-        # 规则2: 有文件但分为 chat → 关键词二次判断
+        # 🌟 优化点4：去掉“发你好就强制拦截要求处理数据”的错误死循环逻辑
         elif has_files and intent == IntentType.CHAT.value:
-            if self._is_chat_query(query):
-                result['clarification_question'] = "检测到您上传了文件，但请求似乎是聊天内容。您是想分析或处理这些文件吗？"
-            elif self._looks_like_data_processing(query):
-                result['intent'] = IntentType.PROCESSING.value
-                result['reasoning'] += " (修正: 有文件且query包含数据处理关键词)"
-            elif self._looks_like_analysis(query):
-                result['intent'] = IntentType.ANALYSIS.value
-                result['reasoning'] += " (修正: 有文件且query包含分析关键词)"
+            # 如果不是闲聊，才做进一步纠正；如果是闲聊（如"你好"），直接放行保留 CHAT 意图！
+            if not self._is_chat_query(query):
+                if self._looks_like_data_processing(query):
+                    result['intent'] = IntentType.PROCESSING.value
+                    result['requires_clarification'] = False
+                    result['clarification_question'] = None
+                    result['reasoning'] += " (修正: 有文件且query非闲聊，包含数据处理关键词)"
+                elif self._looks_like_analysis(query):
+                    result['intent'] = IntentType.ANALYSIS.value
+                    result['requires_clarification'] = False
+                    result['clarification_question'] = None
+                    result['reasoning'] += " (修正: 有文件且query非闲聊，包含分析关键词)"
 
         return result
 
     def _is_chat_query(self, query: str) -> bool:
+        """保持原样"""
         chat_keywords = ['你好', '嗨', 'hello', 'hi', '谢谢', '感谢', '请问', '帮助', '介绍', '功能']
         query_lower = query.lower()
         for keyword in chat_keywords:
@@ -169,19 +179,21 @@ class IntentClassifier:
         return False
 
     def _looks_like_data_processing(self, query: str) -> bool:
+        """保持原样"""
         processing_keywords = ['筛选', '过滤', '排序', '计算', '新增', '添加', '删除',
                               '修改', '更新', '导出', '导入', '合并', '拆分', '转换']
         query_lower = query.lower()
         return any(kw in query_lower for kw in processing_keywords)
 
     def _looks_like_analysis(self, query: str) -> bool:
+        """保持原样"""
         analysis_keywords = ['分析', '总结', '统计', '趋势', '分布', '洞察', '报告',
                             '查看', '观察', '了解', '认识', '特点', '特征']
         query_lower = query.lower()
         return any(kw in query_lower for kw in analysis_keywords)
 
     def _get_default_result(self, query: str, has_files: bool) -> Dict:
-        """LLM 调用失败时的兜底规则"""
+        """保持原样"""
         if not has_files:
             return {
                 "intent": IntentType.CHAT.value,
@@ -215,7 +227,6 @@ class IntentClassifier:
                 "clarification_question": "请具体说明您想对数据做什么操作，例如：分析数据趋势、筛选特定记录、计算统计值等。",
                 "reasoning": "使用默认规则分类"
             }
-
 
 def create_intent_classifier(llm_client: LLMClient) -> IntentClassifier:
     """创建意图分类器的工厂函数"""

@@ -330,13 +330,6 @@ class LLMClient:
 
         # 如果有之前的错误，添加到用户消息中
         if previous_errors and previous_json:
-            # 🚨 核心拦截逻辑：识别特殊前缀，直接抛出异常，斩断重试死循环！
-            for err in previous_errors:
-                if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
-                    # 提取真正的拒绝原因
-                    refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
-                    # 直接抛出 ValueError，外层捕获后会转为 RuntimeError 并通过 SSE 发给前端
-                    raise ValueError(refusal_reason)
             user_message += "\n\n---\n\n"
             user_message += "⚠️ 之前生成的 JSON 验证失败，请修正以下错误：\n\n"
             user_message += f"之前的 JSON：\n```json\n{previous_json}\n```\n\n"
@@ -438,13 +431,6 @@ class LLMClient:
         initial_message = build_initial_user_message(user_requirement, table_schemas or {})
 
         if previous_errors and previous_json:
-            # 🚨 核心拦截逻辑：识别特殊前缀，直接抛出异常，斩断重试死循环！
-            for err in previous_errors:
-                if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
-                    # 提取真正的拒绝原因
-                    refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
-                    # 直接抛出 ValueError，外层捕获后会转为 RuntimeError 并通过 SSE 发给前端
-                    raise ValueError(refusal_reason)
             # 重试场景：使用多轮对话形式
             messages = [
                 {"role": "user", "content": initial_message},

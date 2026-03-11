@@ -234,9 +234,27 @@ async def stream_processing_pipeline(
             tracker.done(ctx.step, ctx.output)
             await repo.save_steps(turn_id, tracker)
         elif ctx.event_type == EventType.STAGE_ERROR:
-            tracker.error(ctx.step, "STEP_ERROR", ctx.error)
-            await repo.mark_failed(turn_id, tracker)
-            await repo.commit()
+            # 🌟 优化：拦截特定的报错，转化为“澄清”步骤
+            error_keywords = ["请检查", "请指定", "不完整", "LLM 无法处理"]
+            if ctx.error and any(kw in ctx.error for kw in error_keywords):
+                 # 1. 优雅关闭当前中断的步骤（如 execute），避免状态卡在 running
+                 try:
+                     tracker.error(ctx.step, "INTERRUPTED", "需要用户补充信息")
+                 except Exception:
+                     pass
+                 
+                 # 2. 【核心修复】先 start 再 done！完美符合 StepTracker 的状态机要求
+                 tracker.start("clarify")
+                 tracker.done("clarify", {"message": ctx.error})
+                 
+                 # 3. 保存步骤，但不调用 mark_failed，让这次对话在历史记录中存活
+                 await repo.save_steps(turn_id, tracker)
+                 await repo.commit()  # 确保状态落库
+            else:
+                 # 未命中拦截关键字的真·系统崩溃
+                 tracker.error(ctx.step, "STEP_ERROR", ctx.error)
+                 await repo.mark_failed(turn_id, tracker)
+                 await repo.commit()
 
     async def load_tables():
         files = await get_files_by_ids_from_db(db, file_ids, user_id)
