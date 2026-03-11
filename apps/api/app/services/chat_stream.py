@@ -66,8 +66,23 @@ async def stream_chat_response(
             event="message",
         )
 
+        # 🚨【核心修复 1：补上澄清轮次的落库与文件关联】🚨
+        try:
+            await chat_service._save_conversation_turn(
+                thread_id=UUID(actual_thread_id),
+                query=query,
+                response=reply_text,
+                db_session=db,
+                user_id=user_id,
+                file_ids=file_ids  
+            )
+            logger.info(f"✅ 澄清轮次及文件关联已落库: thread={actual_thread_id}, files={file_ids}")
+        except Exception as e:
+            logger.error(f"❌ 保存澄清轮次失败: {e}", exc_info=True)
+
     # 2. 真正的纯聊天，直接接入 LLM 流式输出
     elif intent_result.get("intent") == IntentType.CHAT.value:
+        # ...（这部分代码保持你原本的逻辑不变）...
         yield sse({"step": "chat", "status": "running"}, event="message")
         full_reply = ""
         try:
@@ -88,7 +103,6 @@ async def stream_chat_response(
                 {"step": "chat", "status": "done", "output": full_reply},
                 event="message",
             )
-
         except Exception as e:
             logger.error(f"聊天服务流式调用失败: {e}", exc_info=True)
             error_msg = "抱歉，目前系统出小差了，请稍后再试。"
@@ -98,9 +112,23 @@ async def stream_chat_response(
             )
 
     else:
+        fallback_msg = "您的需求不够明确，请具体说明。"
         yield sse(
-            {"step": "chat", "status": "done", "output": "您的需求不够明确，请具体说明。"},
+            {"step": "chat", "status": "done", "output": fallback_msg},
             event="message",
         )
+        
+        # 🚨【补充修复 2：兜底错误也应该落库，避免历史断层】🚨
+        try:
+            await chat_service._save_conversation_turn(
+                thread_id=UUID(actual_thread_id),
+                query=query,
+                response=fallback_msg,
+                db_session=db,
+                user_id=user_id,
+                file_ids=file_ids
+            )
+        except Exception as e:
+            logger.error(f"❌ 保存兜底澄清轮次失败: {e}", exc_info=True)
 
     yield sse({"step": "complete", "status": "done"}, event="message")
