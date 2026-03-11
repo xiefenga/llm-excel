@@ -12,7 +12,6 @@ from app.engine.prompt import (
     get_analysis_prompt_with_schema,
     get_generation_prompt_with_context,
 )
-from app.engine.parser import parse_and_validate
 
 logging.basicConfig(level=logging.INFO)
 
@@ -330,12 +329,9 @@ class LLMClient:
 
         # 如果有之前的错误，添加到用户消息中
         if previous_errors and previous_json:
-            # 🚨 核心拦截逻辑：识别特殊前缀，直接抛出异常，斩断重试死循环！
             for err in previous_errors:
                 if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
-                    # 提取真正的拒绝原因
                     refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
-                    # 直接抛出 ValueError，外层捕获后会转为 RuntimeError 并通过 SSE 发给前端
                     raise ValueError(refusal_reason)
             user_message += "\n\n---\n\n"
             user_message += "⚠️ 之前生成的 JSON 验证失败，请修正以下错误：\n\n"
@@ -438,14 +434,10 @@ class LLMClient:
         initial_message = build_initial_user_message(user_requirement, table_schemas or {})
 
         if previous_errors and previous_json:
-            # 🚨 核心拦截逻辑：识别特殊前缀，直接抛出异常，斩断重试死循环！
             for err in previous_errors:
                 if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
-                    # 提取真正的拒绝原因
                     refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
-                    # 直接抛出 ValueError，外层捕获后会转为 RuntimeError 并通过 SSE 发给前端
                     raise ValueError(refusal_reason)
-            # 重试场景：使用多轮对话形式
             messages = [
                 {"role": "user", "content": initial_message},
                 {"role": "assistant", "content": previous_json},
@@ -495,68 +487,6 @@ class LLMClient:
             # 注意：调用方需要在最后对 full_content 调用 _clean_json_response
         except Exception as e:
             raise RuntimeError(f"生成操作描述失败: {str(e)}") from e
-
-    # ==================== 完整两步流程 ====================
-
-    def process_requirement(
-        self,
-        user_requirement: str,
-        table_schemas: Optional[Dict[str, Dict[str, str]]] = None,
-        available_tables: Optional[List[str]] = None
-    ) -> Dict:
-        """
-        完整的两步处理流程
-
-        Args:
-            user_requirement: 用户需求
-            table_schemas: 表结构信息
-            available_tables: 可用的表名列表
-
-        Returns:
-            {
-                "analysis": str,           # 需求分析结果
-                "json_str": str,           # 生成的 JSON
-                "operations": List[Operation],  # 解析后的操作列表
-                "errors": List[str]        # 错误列表
-            }
-        """
-        result = {
-            "analysis": None,
-            "json_str": None,
-            "operations": [],
-            "errors": []
-        }
-
-        # 第一步：需求分析
-        try:
-            analysis = self.analyze_requirement(user_requirement, table_schemas)
-            result["analysis"] = analysis
-        except Exception as e:
-            result["errors"].append(f"需求分析失败: {str(e)}")
-            return result
-
-        # 第二步：生成操作描述
-        try:
-            json_str = self.generate_operations(
-                user_requirement, analysis, table_schemas
-            )
-            result["json_str"] = json_str
-        except Exception as e:
-            result["errors"].append(f"生成操作失败: {str(e)}")
-            return result
-
-        # 第三步：解析和验证
-        if available_tables is None and table_schemas:
-            available_tables = list(table_schemas.keys())
-
-        operations, parse_errors = parse_and_validate(
-            json_str, available_tables or []
-        )
-
-        result["operations"] = operations
-        result["errors"].extend(parse_errors)
-
-        return result
 
     # ==================== 辅助方法 ====================
 

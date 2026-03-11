@@ -9,9 +9,6 @@ from app.core.database import AsyncSessionLocal
 from app.api.deps import get_llm_client
 from app.persistence import TurnRepository
 
-from sqlalchemy import select
-from app.models.file import File 
-from app.engine.excel_parser import ExcelParser
 import asyncio
 from app.services.excel import get_files_by_ids_from_db, load_tables_from_files
 
@@ -135,13 +132,12 @@ class IntentService:
             if has_files and db_session and user_id:
                 schema_info = await self._extract_schema_info(file_ids, db_session, user_id)
 
-            # 调用分类器（此时分类器已经“重见光明”）
             classification_result = self.intent_classifier.classify(
                 query=query,
                 has_files=has_files,
                 file_count=file_count,
                 history_messages=history_messages,
-                schema_info=schema_info  # 👈 喂给模型
+                schema_info=schema_info
             )
 
             # 获取意图类型
@@ -380,32 +376,6 @@ class IntentService:
                 error_msg=f"处理澄清响应失败: {str(e)}"
             )
     
-    def should_proceed_to_processing(self, intent_result: Dict) -> bool:
-        """
-        判断是否应该继续到实际处理
-        
-        Args:
-            intent_result: 意图识别结果
-            
-        Returns:
-            True如果应该继续处理，False如果需要澄清或错误
-        """
-        # 检查是否需要澄清
-        if intent_result.get('requires_clarification', True):
-            return False
-        
-        # 检查置信度是否足够高
-        confidence = intent_result.get('confidence', 0)
-        if confidence < 0.4:  # 置信度阈值
-            return False
-        
-        # 检查是否有有效的处理路由
-        processing_route = intent_result.get('processing_route', '')
-        if not processing_route or processing_route == '/api/chat/clarify':
-            return False
-        
-        return True
-
 
 # 工厂函数和依赖注入
 async def get_intent_service(db_session: Optional[AsyncSessionLocal] = None) -> IntentService:

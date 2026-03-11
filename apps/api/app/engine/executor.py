@@ -586,13 +586,6 @@ class Executor:
     def _execute_add_column(self, op: AddColumnOperation) -> OperationResult:
         """
         执行新增列操作
-
-        优化点：
-        1. 预先缓存所有列数据，避免每行重复获取
-        2. 复用 FormulaEvaluator 实例
-        3. 支持变量引用
-        4. 详细的行级错误报告
-        5. 不直接修改 Table（由调用方统一应用）
         """
         try:
             # 使用 file_id 和 table（sheet_name）获取表
@@ -600,21 +593,19 @@ class Executor:
             row_count = table.row_count()
             columns = table.get_columns()
 
-            # ✅ 优化 1: 预先缓存所有列数据
             column_cache: Dict[str, List[Any]] = {
                 col_name: table.get_column(col_name)
                 for col_name in columns
             }
 
-            # ✅ 优化 2: 复用 FormulaEvaluator 实例
             evaluator = FormulaEvaluator(
                 tables=self.tables,
                 functions=ROW_FUNC_MAP,
-                variables=self.variables,  # ✅ 支持变量引用
+                variables=self.variables,
             )
 
             column_values = []
-            row_errors = []  # ✅ 优化 4: 记录行级错误
+            row_errors = []
 
             # 为每一行计算值
             for row_idx in range(row_count):
@@ -633,9 +624,6 @@ class Executor:
                 except Exception as e:
                     column_values.append(ExcelError("#ERROR"))
                     row_errors.append(f"行 {row_idx + 2}: {str(e)}")
-
-            # ✅ 优化 5: 不直接修改 Table，由调用方统一应用
-            # （移除了 table.add_column(op.name, column_values)）
 
             # 构建结果
             result = OperationResult(operation=op, value=column_values)
@@ -770,12 +758,11 @@ class Executor:
                 operator = cond["op"]
                 raw_value = cond["value"]
                 
-                # ✅ 对 value 进行表达式求值（支持变量引用）
                 if isinstance(raw_value, dict):
                     evaluator = FormulaEvaluator(
                         tables=self.tables,
                         functions=ROW_FUNC_MAP,
-                        variables=self.variables  # 传入变量上下文
+                        variables=self.variables
                     )
                     value = evaluator.evaluate(raw_value)
                 else:

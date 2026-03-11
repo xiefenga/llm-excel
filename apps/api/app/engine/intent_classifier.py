@@ -26,7 +26,6 @@ class IntentClassifier:
     历史对话通过 messages 数组传入，而非字符串拼接。
     """
 
-    # 🌟 优化点1：改为动态模板，注入Schema，并增加严格的隔离指令
     SYSTEM_PROMPT_TEMPLATE = """\
 你是一个精准的意图分类器。请严格区分【历史对话记录】和用户的【当前最新指令】。历史记录仅作背景参考，你必须仅针对【当前最新指令】做出意图分类判断！
 
@@ -66,7 +65,6 @@ class IntentClassifier:
             # 格式化动态 System Prompt
             system_prompt = self.SYSTEM_PROMPT_TEMPLATE.replace("{schema_info}", schema_info)
 
-            # 🌟 优化点3：实施物理隔离（Boundary Framing）
             messages = []
             if history_messages:
                 messages.append({"role": "system", "content": "--- 以下为历史对话记录，仅作为上下文参考，切勿作为当前意图的判断主体 ---"})
@@ -95,7 +93,7 @@ class IntentClassifier:
             return self._get_default_result(query, has_files)
 
     def _parse_response(self, response: str) -> Dict:
-        """解析LLM响应 (保持原样)"""
+        """解析 LLM 响应"""
         try:
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
@@ -150,9 +148,7 @@ class IntentClassifier:
             result['clarification_question'] = "数据分析或处理需要上传文件，请先上传相关文件。"
             result['reasoning'] += " (修正: 无文件时不能进行数据分析或处理)"
 
-        # 🌟 优化点4：去掉“发你好就强制拦截要求处理数据”的错误死循环逻辑
         elif has_files and intent == IntentType.CHAT.value:
-            # 如果不是闲聊，才做进一步纠正；如果是闲聊（如"你好"），直接放行保留 CHAT 意图！
             if not self._is_chat_query(query):
                 if self._looks_like_data_processing(query):
                     result['intent'] = IntentType.PROCESSING.value
@@ -168,7 +164,7 @@ class IntentClassifier:
         return result
 
     def _is_chat_query(self, query: str) -> bool:
-        """保持原样"""
+        """判断是否为闲聊请求"""
         chat_keywords = ['你好', '嗨', 'hello', 'hi', '谢谢', '感谢', '请问', '帮助', '介绍', '功能']
         query_lower = query.lower()
         for keyword in chat_keywords:
@@ -179,21 +175,21 @@ class IntentClassifier:
         return False
 
     def _looks_like_data_processing(self, query: str) -> bool:
-        """保持原样"""
+        """判断是否像数据处理请求"""
         processing_keywords = ['筛选', '过滤', '排序', '计算', '新增', '添加', '删除',
                               '修改', '更新', '导出', '导入', '合并', '拆分', '转换']
         query_lower = query.lower()
         return any(kw in query_lower for kw in processing_keywords)
 
     def _looks_like_analysis(self, query: str) -> bool:
-        """保持原样"""
+        """判断是否像分析请求"""
         analysis_keywords = ['分析', '总结', '统计', '趋势', '分布', '洞察', '报告',
                             '查看', '观察', '了解', '认识', '特点', '特征']
         query_lower = query.lower()
         return any(kw in query_lower for kw in analysis_keywords)
 
     def _get_default_result(self, query: str, has_files: bool) -> Dict:
-        """保持原样"""
+        """返回默认分类结果"""
         if not has_files:
             return {
                 "intent": IntentType.CHAT.value,

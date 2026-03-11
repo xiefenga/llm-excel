@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.core.config import settings
-from app.api.routes import chat, chat_conversation, auth, file, thread, btrack, role, user, llm
+from app.api.routes import auth, btrack, chat, file, llm, role, thread, user
 
 api_router = APIRouter()
 
@@ -27,4 +27,3 @@ if settings.ENV == "development":
     from app.api.routes import fixture
 
     api_router.include_router(fixture.router, tags=["测试数据"])
-

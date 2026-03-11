@@ -1,4 +1,4 @@
-"""处理管线 - 从 data_processing.py 和 intent.py 提取的公共处理流程"""
+"""处理管线"""
 
 import asyncio
 import json
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorCode:
-    """错误码常量（与 data_processing.py 保持一致）"""
+    """错误码常量"""
 
     THREAD_NOT_FOUND = "THREAD_NOT_FOUND"
     FILE_NOT_FOUND = "FILE_NOT_FOUND"
@@ -168,8 +168,8 @@ async def stream_processing_pipeline(
         query: 用户查询
         file_ids: 文件 ID 列表（UUID）
         thread_id: 线程 ID（可选）
-        intent_type: 意图类型。有值时 session 事件格式为 {"thread_id", "intent"}（intent.py 格式），
-                     为 None 时格式为 {"thread_id", "turn_id", "title", "is_new_thread"}（data_processing 格式）
+        intent_type: 意图类型。有值时 session 事件格式为 {"thread_id", "intent"}，
+                     为 None 时格式为 {"thread_id", "turn_id", "title", "is_new_thread"}
         intent_context: 上下文快照（可选，来自意图识别结果）
         enhance_query_with_history: 是否用历史对话增强 query
         history_limit: 历史对话轮次数限制
@@ -192,13 +192,11 @@ async def stream_processing_pipeline(
 
     # === 发送 session 事件 ===
     if intent_type is not None:
-        # intent.py 格式
         yield sse(
             {"thread_id": actual_thread_id, "intent": intent_type},
             event="session",
         )
     else:
-        # data_processing.py 格式
         yield sse_session(
             session_result["thread_id"],
             session_result["turn_id"],
@@ -234,24 +232,19 @@ async def stream_processing_pipeline(
             tracker.done(ctx.step, ctx.output)
             await repo.save_steps(turn_id, tracker)
         elif ctx.event_type == EventType.STAGE_ERROR:
-            # 🌟 优化：拦截特定的报错，转化为“澄清”步骤
             error_keywords = ["请检查", "请指定", "不完整", "LLM 无法处理"]
             if ctx.error and any(kw in ctx.error for kw in error_keywords):
-                 # 1. 优雅关闭当前中断的步骤（如 execute），避免状态卡在 running
                  try:
                      tracker.error(ctx.step, "INTERRUPTED", "需要用户补充信息")
                  except Exception:
                      pass
-                 
-                 # 2. 【核心修复】先 start 再 done！完美符合 StepTracker 的状态机要求
+
                  tracker.start("clarify")
                  tracker.done("clarify", {"message": ctx.error})
-                 
-                 # 3. 保存步骤，但不调用 mark_failed，让这次对话在历史记录中存活
+
                  await repo.save_steps(turn_id, tracker)
-                 await repo.commit()  # 确保状态落库
+                 await repo.commit()
             else:
-                 # 未命中拦截关键字的真·系统崩溃
                  tracker.error(ctx.step, "STEP_ERROR", ctx.error)
                  await repo.mark_failed(turn_id, tracker)
                  await repo.commit()

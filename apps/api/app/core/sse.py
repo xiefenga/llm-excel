@@ -56,7 +56,7 @@ def sse_session(
     title: str,
     is_new_thread: bool,
 ) -> ServerSentEvent:
-    """创建 session 事件（data_processing 格式）"""
+    """创建 session 事件"""
     return sse(
         {
             "thread_id": thread_id,

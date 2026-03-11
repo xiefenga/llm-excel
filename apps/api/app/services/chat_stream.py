@@ -1,4 +1,4 @@
-"""聊天流式响应 - 从 intent.py 分支 A 提取"""
+"""聊天流式响应"""
 
 import asyncio
 import logging
@@ -52,7 +52,6 @@ async def stream_chat_response(
 
     reply_text = intent_result.get("clarification_question")
 
-    # 1. 如果有反问/澄清文本，走伪装打字机输出
     if reply_text:
         yield sse({"step": "chat", "status": "running"}, event="message")
         for char in reply_text:
@@ -66,7 +65,6 @@ async def stream_chat_response(
             event="message",
         )
 
-        # 🚨【核心修复 1：补上澄清轮次的落库与文件关联】🚨
         try:
             await chat_service._save_conversation_turn(
                 thread_id=UUID(actual_thread_id),
@@ -74,15 +72,13 @@ async def stream_chat_response(
                 response=reply_text,
                 db_session=db,
                 user_id=user_id,
-                file_ids=file_ids  
+                file_ids=file_ids
             )
             logger.info(f"✅ 澄清轮次及文件关联已落库: thread={actual_thread_id}, files={file_ids}")
         except Exception as e:
             logger.error(f"❌ 保存澄清轮次失败: {e}", exc_info=True)
 
-    # 2. 真正的纯聊天，直接接入 LLM 流式输出
     elif intent_result.get("intent") == IntentType.CHAT.value:
-        # ...（这部分代码保持你原本的逻辑不变）...
         yield sse({"step": "chat", "status": "running"}, event="message")
         full_reply = ""
         try:
@@ -118,7 +114,6 @@ async def stream_chat_response(
             event="message",
         )
         
-        # 🚨【补充修复 2：兜底错误也应该落库，避免历史断层】🚨
         try:
             await chat_service._save_conversation_turn(
                 thread_id=UUID(actual_thread_id),

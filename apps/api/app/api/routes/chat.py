@@ -65,8 +65,6 @@ class ChatErrorCode:
     """错误码常量"""
 
     INVALID_FILE_IDS = "INVALID_FILE_IDS"
-    RECOGNITION_FAILED = "RECOGNITION_FAILED"
-    CLARIFICATION_FAILED = "CLARIFICATION_FAILED"
 
 
 # ============ API Endpoints ============
@@ -110,11 +108,10 @@ async def chat(
                 file_ids=file_ids,
                 thread_id=request.thread_id,
                 db_session=db,
-                user_id=current_user.id  # 👈 新增这一行
+                user_id=current_user.id
             )
             file_ids = intent_result.get("file_ids", file_ids)
 
-            # === 分支 A：需要澄清 / 纯聊天 ===
             if intent_result.get("requires_clarification") or intent_result.get("intent") == IntentType.CHAT.value:
                 async for event in stream_chat_response(
                     query=request.query,
@@ -127,7 +124,6 @@ async def chat(
                     yield event
                 return
 
-            # === 分支 B：数据处理 ===
             if intent_result.get("intent") in [IntentType.PROCESSING.value, IntentType.ANALYSIS.value]:
                 async for event in stream_processing_pipeline(
                     db=db,

@@ -321,10 +321,7 @@ async def stream_excel_processing(
                 event_type = EventType.STAGE_ERROR
                 error_msg = "; ".join(errors) if isinstance(errors, list) else str(errors)
 
-        # 🚨 新增：检查异常是否是我们定制的打断异常
         if event_type == EventType.STAGE_ERROR and error_msg:
-             # 如果 error_msg 中包含了我们在 llm_client 抛出的原话（或者就是那个 ValueError 的 message）
-             # 这里可以根据实际抛出的内容特征进行判断，通常它是不包含 Python 堆栈的纯自然语言
              if "请检查需求中的列名是否正确" in error_msg or "请指定要删除的具体列名" in error_msg or "LLM 无法处理" in error_msg or "需求描述不完整" in error_msg:
                  is_intentional_refusal = True
 
@@ -352,16 +349,12 @@ async def stream_excel_processing(
             yield sse_step_done(step_name, event.output, stage_id)
 
         elif event_type == EventType.STAGE_ERROR:
-            # 🌟 核心改造：优雅降级为 Chat
             if is_intentional_refusal:
-                # 1. 伪装成 Chat 状态发送给前端
                 yield ServerSentEvent(
                     data=json.dumps({"step": "chat", "status": "running"}),
                     event="message"
                 )
-                
-                # 2. 模拟打字机效果发送错误原因（反问内容）
-                # 这里为了简化，直接发送完整的 output。前端收到 done 就会渲染在对话框里
+
                 clean_msg = error_msg.replace("LLM 无法处理:", "").replace("生成操作失败:", "").strip()
                 yield ServerSentEvent(
                     data=json.dumps({"step": "chat", "status": "done", "output": clean_msg}),
