@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/excel/chat": {
+    "/chat": {
         parameters: {
             query?: never;
             header?: never;

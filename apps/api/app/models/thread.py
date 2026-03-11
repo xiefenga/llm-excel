@@ -85,9 +85,26 @@ class ThreadTurn(Base):
     turn_number: Mapped[int] = mapped_column(Integer, nullable=False)
     user_query: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    
+    # 意图类型：chat/analysis/data_processing 等
+    intent_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    
+    # AI 回复文本
+    response_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # 核心字段：存储所有步骤的执行历史
     steps: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    
+    # 上下文快照：存储对话上下文信息
+    context_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    
+    # 父轮次ID：支持对话链
+    parent_turn_id: Mapped[Optional[UUID]] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("thread_turns.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

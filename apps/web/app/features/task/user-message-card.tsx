@@ -35,8 +35,8 @@ const UserMessageCard = ({ content, files = [], timestamp, avatar, className }: 
       await navigator.clipboard.writeText(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy:', err)
+    } catch {
+      // 复制失败，静默处理
     }
   }
 

@@ -48,3 +48,26 @@ def sse_step_done(step: str, output: Any, stage_id: Optional[str] = None) -> Ser
 def sse_step_error(step: str, error: str, stage_id: str) -> ServerSentEvent:
     """创建步骤错误事件"""
     return sse({"step": step, "status": StepStatus.ERROR, "error": error, "stage_id": stage_id})
+
+
+def sse_session(
+    thread_id: str,
+    turn_id: str,
+    title: str,
+    is_new_thread: bool,
+) -> ServerSentEvent:
+    """创建 session 事件"""
+    return sse(
+        {
+            "thread_id": thread_id,
+            "turn_id": turn_id,
+            "title": title,
+            "is_new_thread": is_new_thread,
+        },
+        event="session",
+    )
+
+
+def sse_session_error(code: str, message: str) -> ServerSentEvent:
+    """创建会话级错误事件"""
+    return sse({"code": code, "message": message}, event="error")

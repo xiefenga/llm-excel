@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
-import { useState, useMemo } from 'react'
-import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect, useImperativeHandle, useCallback } from 'react'
+import { RefreshCw, Sparkles, Download, Lightbulb, ListChecks, AlertCircle, FileSpreadsheet, Activity, Clock, Loader2 } from 'lucide-react'
 
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
@@ -11,6 +11,7 @@ import { StepItem } from '~/components/step-item'
 import ExcelPreview from '~/components/excel-preview'
 import InsightCard from '~/components/insight-card'
 import ExcelIcon from '~/assets/iconify/vscode-icons/file-type-excel.svg?react'
+import { Streamdown } from 'streamdown'
 
 import { cn } from '~/lib/utils'
 
@@ -98,6 +99,12 @@ export interface ChatPanelProps {
   // ========== UI 配置 ==========
   /** 用户头像 */
   userAvatar?: string
+  /** ref handle */
+  ref?: React.Ref<ChatPanelHandle>
+}
+
+export interface ChatPanelHandle {
+  scrollToBottom: () => void
 }
 
 /** 计算步骤耗时 */
@@ -140,6 +147,7 @@ const ChatPanel = ({
   selectedHistoryFiles = [],
   onToggleHistoryFile,
   userAvatar,
+  ref,
 }: ChatPanelProps) => {
   const {
     fileItems,
@@ -151,26 +159,49 @@ const ChatPanel = ({
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null)
 
+  // ========== 自动滚动 ==========
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const isSticky = useRef(true)
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    isSticky.current = true
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight })
+    })
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50
+    isSticky.current = atBottom
+  }, [])
+
+  // 暴露 scrollToBottom 给父组件
+  useImperativeHandle(ref, () => ({ scrollToBottom }), [scrollToBottom])
+
+  // 流式响应期间，sticky 时跟随滚动
+  useEffect(() => {
+    if (isProcessing && isSticky.current) {
+      scrollToBottom()
+    }
+  }, [turns, isProcessing, scrollToBottom])
+
   // 是否为空对话（无历史轮次）
   const isEmptyConversation = turns.length === 0
 
   // 是否可以提交：
-  // - 空对话时：需要有文件且有内容
-  // - 有历史时：只需要有内容（可以基于历史文件继续）
+  // - 允许纯文本聊天，不强制要求文件
+  // - 如果有文件，可以处理文件；如果没有文件，可以进行纯文本对话
   const canSubmit = useMemo(() => {
     if (isProcessing || isUploading) return false
     if (!query.trim()) return false
-
-    // 空对话时需要上传文件
-    if (isEmptyConversation) {
-      return fileItems.some(f => f.status === 'success')
-    }
-
-    // 有历史时，有新文件或选中了历史文件都可以
-    const hasNewFiles = fileItems.some(f => f.status === 'success')
-    const hasSelectedHistory = selectedHistoryFiles.length > 0
-    return hasNewFiles || hasSelectedHistory || availableFiles.length > 0
-  }, [isProcessing, isUploading, query, isEmptyConversation, fileItems, selectedHistoryFiles, availableFiles])
+    
+    // 允许纯文本聊天，不强制要求文件
+    return true
+  }, [isProcessing, isUploading, query])
 
   // 添加文件
   const handleAddFiles = (files: File[]) => {
@@ -183,7 +214,7 @@ const ChatPanel = ({
   return (
     <div className="h-full flex flex-col bg-linear-to-br from-slate-50 via-white to-brand-muted/20">
       {/* 滚动内容区 */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         <div className="p-5 space-y-4">
           {/* 欢迎信息（仅在空对话且无上传文件时显示） */}
           {isEmptyConversation && fileItems.length === 0 && (
@@ -201,12 +232,12 @@ const ChatPanel = ({
           )}
 
           {/* 多轮对话渲染 */}
-          {turns.map((turn) => (
+          {turns.map((turn, index) => (
             <TurnRenderer
               key={turn.id}
               turn={turn}
               userAvatar={userAvatar}
-              isActive={turn.id === activeTurnId}
+              isActive={isProcessing && index === turns.length - 1}
               onRetry={onRetry}
             />
           ))}
@@ -277,6 +308,19 @@ const TurnRenderer = ({
     return executeStep?.output as ExecuteStepOutput | null
   }, [assistantMessage])
 
+  // 是否处于等待响应状态（已发送消息，但 AI 尚未开始返回可见内容）
+  const isWaitingResponse = isActive && (
+    !assistantMessage ||
+    assistantMessage.steps.length === 0 ||
+    // chat 步骤已创建但尚无实际文本（等待 LLM 首个 token）
+    (assistantMessage.steps.length > 0 && assistantMessage.steps.every(s =>
+      s.step === 'chat' && (
+        s.status === 'running' ||
+        (s.status === 'streaming' && !(s as any).streamContent)
+      )
+    ))
+  )
+
   // 状态判断
   const hasSteps = assistantMessage && assistantMessage.steps.length > 0
   const isAllDone = assistantMessage?.status === 'done' && hasSteps
@@ -303,18 +347,64 @@ const TurnRenderer = ({
         avatar={userAvatar}
       />
 
+      {/* 等待响应 loading */}
+      {isWaitingResponse && (
+        <div className="flex items-center gap-2.5 py-3 px-1">
+          <Loader2 className="w-4 h-4 text-brand animate-spin" />
+          <span className="text-sm text-gray-500">正在思考</span>
+          <span className="flex gap-0.5">
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
+            <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
+          </span>
+        </div>
+      )}
+
       {/* AI 响应 */}
       {assistantMessage && (
         <>
           {/* 步骤列表 */}
           {hasSteps && (
             <section className="space-y-2">
-              {assistantMessage.steps.map((record, index) => (
-                <StepItem
-                  key={`${record.step}-${index}`}
-                  record={record}
-                />
-              ))}
+              {assistantMessage.steps.map((record, index) => {
+                // ==========================================
+                // 💡 重点修改位置：拦截 'chat' 步骤，用普通文本渲染
+                // ==========================================
+                if (record.step === 'chat') {
+                  let content = '';
+                  if (record.status === 'streaming') {
+                    content = (record as any).streamContent || '';
+                  } else if (record.status === 'done') {
+                    content = (record as any).output || '';
+                  }
+
+                  const isStreaming = record.status === 'streaming';
+
+                  return (
+                    <div
+                      key={`${record.step}-${index}`}
+                      className="text-sm text-gray-800 leading-relaxed py-2 px-1"
+                    >
+                      <Streamdown
+                        mode={isStreaming ? 'streaming' : 'static'}
+                        caret={isStreaming ? 'block' : undefined}
+                      >
+                        {typeof content === 'string' ? content : ''}
+                      </Streamdown>
+                    </div>
+                  );
+                }
+
+                // ==========================================
+                // 非 chat 步骤 (如 generate, execute) 依然交给 StepItem 渲染
+                // ==========================================
+                return (
+                  <StepItem
+                    key={`${record.step}-${index}`}
+                    record={record}
+                  />
+                );
+              })}
 
               {/* 全局错误 */}
               {assistantMessage.status === 'error' && assistantMessage.error && (

@@ -1,23 +1,23 @@
 // ========== 用户消息类型 ==========
 export interface UserMessageAttachment {
-  id: string
-  filename: string
-  path: string
+  id: string;
+  filename: string;
+  path: string;
 }
 
 export interface UserMessage {
   id: string;
   role: "user";
   content: string;
-  files?: UserMessageAttachment[]
-  created: number
-  avatar: string
+  files?: UserMessageAttachment[];
+  created: number;
+  avatar: string;
 }
 
 // ========== Step 类型定义（对齐 SSE_SPEC 和 STEPS_STORAGE_SPEC）==========
 
-/** 步骤名称 */
-export type StepName = "load" | "generate" | "validate" | "execute" | "export";
+/** 步骤名称 (新增 "chat" 步骤) */
+export type StepName = "load" | "generate" | "validate" | "execute" | "export" | "chat";
 
 /** 步骤状态 */
 export type StepStatus = "running" | "streaming" | "done" | "error";
@@ -89,13 +89,17 @@ export interface ExportStepOutput {
   output_files: OutputFileInfo[];
 }
 
-/** 步骤 Output 类型映射 */
+/** chat 步骤输出 (新增，兼容纯字符串或对象) */
+export type ChatStepOutput = string | Record<string, unknown>;
+
+/** 步骤 Output 类型映射 (新增 chat 映射) */
 export type StepOutputMap = {
   load: LoadStepOutput;
   generate: GenerateStepOutput;
   validate: ValidateStepOutput;
   execute: ExecuteStepOutput;
   export: ExportStepOutput;
+  chat: ChatStepOutput;
 };
 
 // ========== Step 记录类型（存储格式）==========
@@ -184,52 +188,3 @@ export interface AssistantMessage {
 
 // ========== 消息联合类型 ==========
 export type Message = UserMessage | AssistantMessage;
-
-// ========== 工具函数类型 ==========
-
-/** 有效的步骤名称列表 */
-const VALID_STEP_NAMES: StepName[] = ["load", "generate", "validate", "execute", "export"];
-
-/** 获取每个步骤的最终状态 */
-export function getLatestSteps(steps: StepRecord[]): Partial<Record<StepName, StepRecord>> {
-  return steps.reduce(
-    (acc, step) => {
-      const stepName = step.step as string;
-      if (VALID_STEP_NAMES.includes(stepName as StepName)) {
-        acc[stepName as StepName] = step;
-      }
-      return acc;
-    },
-    {} as Partial<Record<StepName, StepRecord>>,
-  );
-}
-
-/** 获取指定步骤的最终记录（类型安全）*/
-export function getStepRecord<T extends StepName>(
-  steps: StepRecord[],
-  stepName: T
-): StepRecord<T> | undefined {
-  const records = steps.filter(s => s.step === stepName);
-  return records[records.length - 1] as StepRecord<T> | undefined;
-}
-
-/** 判断步骤是否完成 */
-export function isStepDone<T extends StepName>(
-  record: StepRecord<T> | undefined
-): record is DoneStepRecord<T> {
-  return record?.status === "done";
-}
-
-/** 判断步骤是否有错误 */
-export function isStepError<T extends StepName>(
-  record: StepRecord<T> | undefined
-): record is ErrorStepRecord<T> {
-  return record?.status === "error";
-}
-
-/** 判断步骤是否正在流式输出 */
-export function isStepStreaming<T extends StepName>(
-  record: StepRecord<T> | undefined
-): record is StreamingStepRecord<T> {
-  return record?.status === "streaming";
-}

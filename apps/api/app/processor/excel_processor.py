@@ -1,7 +1,7 @@
 """Excel 处理器"""
 
 import logging
-from typing import Generator, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, Generator, List, Optional, Tuple, TYPE_CHECKING, Any
 
 from .types import (
     ProcessStage,
@@ -16,6 +16,7 @@ from .stages.analyze import StageError
 if TYPE_CHECKING:
     from app.engine.models import FileCollection
     from app.engine.llm_client import LLMClient
+    from app.engine.context_builder import ContextBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +46,20 @@ class ExcelProcessor:
             yield convert_to_sse(event)
     """
 
-    def __init__(self, llm_client: "LLMClient"):
+    def __init__(self, llm_client: "LLMClient", context_builder: Optional["ContextBuilder"] = None):
         """
         初始化处理器
 
         Args:
             llm_client: LLM 客户端
+            context_builder: 上下文构建器（可选）
         """
         self.llm_client = llm_client
+        self.context_builder = context_builder
 
         # 创建各阶段实例（线性列表，保持可扩展性）
         self._stages = [
-            GenerateValidateStage(llm_client),  # 复合阶段：生成+验证（支持重试）
+            GenerateValidateStage(llm_client, context_builder),  # 复合阶段：生成+验证（支持重试）
             ExecuteStage(),
         ]
 
@@ -65,6 +68,7 @@ class ExcelProcessor:
         tables: "FileCollection",
         query: str,
         config: Optional[ProcessConfig] = None,
+        initial_context: Optional[Dict[str, Any]] = None,
     ) -> Generator[ProcessEvent, None, ProcessResult]:
         """
         处理 Excel 数据（生成器模式）
@@ -73,6 +77,7 @@ class ExcelProcessor:
             tables: 已加载的表集合
             query: 用户查询
             config: 处理配置
+            initial_context: 初始上下文（可选）
 
         Yields:
             ProcessEvent: 处理事件
@@ -90,7 +95,7 @@ class ExcelProcessor:
         """
         config = config or ProcessConfig()
         result = ProcessResult()
-        context = {}  # 阶段间共享上下文
+        context = initial_context or {}  # 阶段间共享上下文
 
         for stage in self._stages:
             try:

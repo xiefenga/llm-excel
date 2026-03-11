@@ -884,6 +884,16 @@ def parse_and_validate(
     Returns:
         (操作列表, 错误列表)
     """
+    #新增拦截逻辑：识别 LLM 的合法拒绝
+    try:
+        data = json.loads(json_str)
+        if isinstance(data, dict) and data.get("error") == "UNSUPPORTED":
+            # 如果大模型主动拒绝执行，抛出一个带有特殊前缀的错误，打断外层的无脑重试
+            reason = data.get("reason", "大模型拒绝执行该操作，存在冲突或不支持。")
+            return [], [f"LLM_INTENTIONAL_REFUSAL:{reason}"]
+    except Exception:
+        pass # 解析 JSON 失败说明不是结构化拒绝，继续走下面的原有逻辑
+
     operations, parse_errors = OperationParser.parse(json_str)
 
     if parse_errors:

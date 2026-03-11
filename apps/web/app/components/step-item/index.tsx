@@ -37,6 +37,10 @@ const STEP_CONFIG: Record<StepName, { label: string; icon: React.ReactNode }> = 
     label: "导出文件",
     icon: <FileSpreadsheet className="w-4 h-4" />,
   },
+  chat: {
+    label: "AI 对话",
+    icon: <Brain className="w-4 h-4" />,
+  },
 }
 
 /** 步骤名称列表 */

@@ -32,7 +32,7 @@ const AdminProviderDetail = ({ params: { providerId }}: Route.ComponentProps) =>
     <div className="flex-1 overflow-y-auto">
       <ProviderHeader provider={provider} />
       <ProviderCredentials provider={provider} />
-      <ProviderModels providerId={provider.id} />
+      <ProviderModels provider={provider} />
     </div>
   );
 };

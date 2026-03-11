@@ -12,7 +12,6 @@ from app.engine.prompt import (
     get_analysis_prompt_with_schema,
     get_generation_prompt_with_context,
 )
-from app.engine.parser import parse_and_validate
 
 logging.basicConfig(level=logging.INFO)
 
@@ -53,34 +52,65 @@ class LLMClient:
         messages: List[Dict[str, str]],
     ) -> LLMRequest:
         defaults = stage_config.model.defaults or {}
+        # 合并 extra_params，支持 provider 特定参数（如 endpoint_suffix）
+        extra_params = defaults.get("extra_params") or {}
+        if "endpoint_suffix" in defaults:
+            extra_params = {**extra_params, "endpoint_suffix": defaults["endpoint_suffix"]}
         return LLMRequest(
             model_id=stage_config.model.model_id,
             messages=messages,
             temperature=defaults.get("temperature", 0),
             max_tokens=defaults.get("max_tokens"),
             response_format=defaults.get("response_format"),
-            extra_params=defaults.get("extra_params") or {},
+            extra_params=extra_params,
         )
 
-    def call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
-        """对外公开的 LLM 调用（非流式）"""
-        return self._call_llm(stage, system_prompt, user_message)
+    def call_llm(
+        self,
+        stage: str,
+        system_prompt: str,
+        user_message: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """对外公开的 LLM 调用（非流式）
 
-    def _call_llm(self, stage: str, system_prompt: str, user_message: str) -> str:
+        两种使用方式：
+        1. 简单模式：传 user_message，自动组装为 [system, user]
+        2. 多轮模式：传 messages（不含 system），自动在前面加 system
+        """
+        return self._call_llm(stage, system_prompt, user_message, messages)
+
+    def _call_llm(
+        self,
+        stage: str,
+        system_prompt: str,
+        user_message: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
         """
         调用 LLM
 
         Args:
+            stage: 阶段名称
             system_prompt: 系统提示词
-            user_message: 用户消息
+            user_message: 用户消息（简单场景）
+            messages: 完整消息列表，不含 system（多轮对话场景）
 
         Returns:
             LLM 响应内容
         """
-
         stage_config = self._resolve_stage_config(stage)
         provider = stage_config.provider
         model = stage_config.model
+
+        # 构建消息列表
+        if messages:
+            full_messages = [{"role": "system", "content": system_prompt}] + messages
+        else:
+            full_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
 
         log_msg = (
             "\n"
@@ -88,20 +118,16 @@ class LLMClient:
             f"[阶段] {stage}\n"
             f"[Provider] {provider.name} ({provider.type})\n"
             f"[模型] {model.model_id}\n"
+            f"[消息数] {len(full_messages)}\n"
             "[System Prompt]\n"
             f"{system_prompt}\n"
-            "[User Message]\n"
-            f"{user_message}\n"
         )
+        for i, msg in enumerate(full_messages[1:], 1):
+            log_msg += f"[{msg['role'].upper()} #{i}]\n{msg['content']}\n"
 
         logger.info(log_msg)
 
-        messages = [
-            { "role": "system", "content": system_prompt },
-            { "role": "user", "content": user_message }
-        ]
-
-        request = self._build_request(stage_config, messages)
+        request = self._build_request(stage_config, full_messages)
         adapter = self.provider_registry.get_adapter(provider)
         response = adapter.complete(request)
         result = response.content.strip()
@@ -303,6 +329,10 @@ class LLMClient:
 
         # 如果有之前的错误，添加到用户消息中
         if previous_errors and previous_json:
+            for err in previous_errors:
+                if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
+                    refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
+                    raise ValueError(refusal_reason)
             user_message += "\n\n---\n\n"
             user_message += "⚠️ 之前生成的 JSON 验证失败，请修正以下错误：\n\n"
             user_message += f"之前的 JSON：\n```json\n{previous_json}\n```\n\n"
@@ -404,7 +434,10 @@ class LLMClient:
         initial_message = build_initial_user_message(user_requirement, table_schemas or {})
 
         if previous_errors and previous_json:
-            # 重试场景：使用多轮对话形式
+            for err in previous_errors:
+                if err.startswith("LLM_INTENTIONAL_REFUSAL:"):
+                    refusal_reason = err.split("LLM_INTENTIONAL_REFUSAL:")[1].strip()
+                    raise ValueError(refusal_reason)
             messages = [
                 {"role": "user", "content": initial_message},
                 {"role": "assistant", "content": previous_json},
@@ -454,68 +487,6 @@ class LLMClient:
             # 注意：调用方需要在最后对 full_content 调用 _clean_json_response
         except Exception as e:
             raise RuntimeError(f"生成操作描述失败: {str(e)}") from e
-
-    # ==================== 完整两步流程 ====================
-
-    def process_requirement(
-        self,
-        user_requirement: str,
-        table_schemas: Optional[Dict[str, Dict[str, str]]] = None,
-        available_tables: Optional[List[str]] = None
-    ) -> Dict:
-        """
-        完整的两步处理流程
-
-        Args:
-            user_requirement: 用户需求
-            table_schemas: 表结构信息
-            available_tables: 可用的表名列表
-
-        Returns:
-            {
-                "analysis": str,           # 需求分析结果
-                "json_str": str,           # 生成的 JSON
-                "operations": List[Operation],  # 解析后的操作列表
-                "errors": List[str]        # 错误列表
-            }
-        """
-        result = {
-            "analysis": None,
-            "json_str": None,
-            "operations": [],
-            "errors": []
-        }
-
-        # 第一步：需求分析
-        try:
-            analysis = self.analyze_requirement(user_requirement, table_schemas)
-            result["analysis"] = analysis
-        except Exception as e:
-            result["errors"].append(f"需求分析失败: {str(e)}")
-            return result
-
-        # 第二步：生成操作描述
-        try:
-            json_str = self.generate_operations(
-                user_requirement, analysis, table_schemas
-            )
-            result["json_str"] = json_str
-        except Exception as e:
-            result["errors"].append(f"生成操作失败: {str(e)}")
-            return result
-
-        # 第三步：解析和验证
-        if available_tables is None and table_schemas:
-            available_tables = list(table_schemas.keys())
-
-        operations, parse_errors = parse_and_validate(
-            json_str, available_tables or []
-        )
-
-        result["operations"] = operations
-        result["errors"].extend(parse_errors)
-
-        return result
 
     # ==================== 辅助方法 ====================
 

@@ -61,8 +61,8 @@ const ChatInput = ({ text, onTextChange, onSubmit, onPasteFiles, placeholder, cl
     try {
       setPasteFileProcessing(true);
       await onPasteFiles(files, e);
-    } catch (error) {
-      console.error(error);
+    } catch {
+      // 粘贴文件处理失败，静默处理
     } finally {
       setPasteFileProcessing(false);
     }

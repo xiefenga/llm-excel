@@ -10,8 +10,9 @@ import { useFileUpload } from '~/hooks/use-file-upload'
 
 import { getThreadDetail } from '~/lib/api'
 
-import ChatPanel from './chat-panel'
+import ChatPanel, { type ChatPanelHandle } from './chat-panel'
 import PreviewPanel from './preview-panel'
+import { getLatestOutputFilesFromTurns } from './history-output-files'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '~/components/ui/resizable'
 import {
   AlertDialog,
@@ -27,7 +28,7 @@ import {
 import type { PreviewTab } from './preview-panel'
 import type { ChatMessage } from '~/hooks/use-chat'
 import type { ConversationTurn } from './chat-panel'
-import type { AssistantMessage, UserMessage, StepRecord, StepName, StepError, UserMessageAttachment, OutputFileInfo, ExportStepOutput } from '~/components/llm-chat/message-list/types'
+import type { AssistantMessage, UserMessage, StepRecord, StepName, StepError, OutputFileInfo, ExportStepOutput } from '~/components/llm-chat/message-list/types'
 
 export interface TaskWorkbenchProps {
   threadId?: string
@@ -46,6 +47,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
   const lastLoadedThreadId = useRef<string | undefined>(undefined)
   // 用于标记是否正在开启新会话（避免 useEffect 重复清空）
   const isStartingNewSession = useRef(false)
+  const chatRef = useRef<ChatPanelHandle>(null)
 
   // 任务状态
   const [taskState, setTaskState] = useState<'idle' | 'processing' | 'done' | 'error'>('idle')
@@ -61,23 +63,26 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
   const fileUpload = useFileUpload()
 
   // 聊天/处理逻辑
-  const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useChat({
-    onStart: () => {
-      setTaskState('processing')
-    },
-    onSessionCreated: ({ thread_id }) => {
+// 修改 task-workbench.tsx 中的 useChat 部分
+const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useChat({
+  onStart: () => {
+    setTaskState('processing')
+  },
+  onSessionCreated: ({ thread_id }) => {
+    // 👇 修复：严格判断 thread_id 是否有效
+    if (thread_id && thread_id !== 'null' && thread_id !== 'undefined') {
       initThreadId.current = thread_id
       navigate(`/threads/${thread_id}`)
       queryClient.invalidateQueries({ queryKey: ['threads'] })
-    },
-    onExportSuccess: (files) => {
-      setOutputFiles(files)
-      setTaskState('done')
-      setActiveTurnId(null)
-      // 自动切换到输出预览
-      setPreviewTab('output')
-    },
-  })
+    }
+  },
+  onExportSuccess: (files) => {
+    setOutputFiles(files)
+    setTaskState('done')
+    setActiveTurnId(null)
+    setPreviewTab('output')
+  },
+})
 
   // 将 messages 转换为 turns 格式
   const turns = useMemo<ConversationTurn[]>(() => {
@@ -172,7 +177,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
         } satisfies UserMessage)
 
         // 添加助手消息
-        const turnSteps = (turn.steps || []).map((step) => {
+        let turnSteps = (turn.steps || []).map((step) => {
           const baseStep = {
             step: step.step as StepName,
             started_at: step.started_at,
@@ -190,6 +195,17 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
           }
           return { ...baseStep, status: 'running' as const }
         }) as StepRecord[]
+
+        // Chat 轮次：steps 为空但有 response_text，构造 chat step 用于渲染
+        if (turnSteps.length === 0 && turn.response_text) {
+          turnSteps = [{
+            step: 'chat' as StepName,
+            status: 'done' as const,
+            started_at: turn.created_at,
+            completed_at: turn.completed_at ?? turn.created_at,
+            output: turn.response_text,
+          } as StepRecord]
+        }
 
         // 判断助手消息状态
         let assistantStatus: AssistantMessage['status'] = 'done'
@@ -221,19 +237,16 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
       })
 
       // 提取输出文件 - 从 export 步骤获取
-      const lastTurn = thread.turns[thread.turns.length - 1]
-      if (lastTurn) {
-        const exportStep = lastTurn.steps?.find(s => s.step === 'export' && s.status === 'done')
-        if (exportStep?.output) {
-          const output = exportStep.output as unknown as ExportStepOutput
-          if (output.output_files?.length > 0) {
-            setOutputFiles(output.output_files)
-            setTaskState('done')
-          }
-        }
+      const latestOutputFiles = getLatestOutputFilesFromTurns(thread.turns)
+      if (latestOutputFiles.length > 0) {
+        setOutputFiles(latestOutputFiles)
+        setTaskState('done')
+      } else {
+        setOutputFiles([])
       }
 
       setMessages(loadedMessages)
+      requestAnimationFrame(() => chatRef.current?.scrollToBottom())
     }
   })
 
@@ -303,6 +316,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
     setQuery('')
     // 清空已上传的文件（下一轮需要重新上传或选择历史文件）
     fileUpload.clearFiles()
+    chatRef.current?.scrollToBottom()
   }
 
   // 提交任务
@@ -324,21 +338,8 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
       return
     }
 
-    // 有历史记录时，提示用户开启新会话
-    if (hasHistory) {
-      // 新会话需要文件
-      if (files.length === 0) {
-        return
-      }
-      setShowNewSessionDialog(true)
-      return
-    }
-
-    // 新会话需要文件
-    if (files.length === 0) {
-      return
-    }
-
+    // 有历史记录时，直接继续当前会话（支持多轮对话）
+    // 不再提示用户开启新会话
     doSendMessage(threadId)
   }
 
@@ -401,7 +402,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle>开启新会话</AlertDialogTitle>
             <AlertDialogDescription>
-              目前只支持单轮会话，确认后将开启新会话。
+              确认开启新会话吗？当前会话的历史记录将被清空。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className='justify-center!'>
@@ -433,6 +434,7 @@ const TaskWorkbench = ({ threadId }: TaskWorkbenchProps) => {
         {/* 右侧：对话面板 */}
         <ResizablePanel defaultSize={40} minSize={30}>
           <ChatPanel
+            ref={chatRef}
             turns={turns}
             query={query}
             fileUpload={fileUpload}

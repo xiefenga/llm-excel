@@ -41,12 +41,12 @@ OPENAPI_DESCRIPTION = """
 async def lifespan(app: FastAPI):
     """应用生命周期"""
     # 启动时初始化权限系统
-    print(f"🚀 Selgetabel API v{__version__}  {__build_time__}")
+    print(f"Selgetabel API v{__version__}  {__build_time__}")
 
     yield
 
     # 关闭时清理
-    print("👋 应用正在关闭...")
+    print("应用正在关闭...")
 
 
 app = FastAPI(

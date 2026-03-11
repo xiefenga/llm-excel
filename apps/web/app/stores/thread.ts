@@ -25,7 +25,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
       const data = await getThreads();
       set({ threads: data, isLoading: false });
     } catch (error) {
-      console.error("加载线程列表失败:", error);
       set({
         error: error instanceof Error ? error : new Error("加载失败"),
         isLoading: false,
@@ -40,7 +39,6 @@ export const useThreadStore = create<ThreadState>((set, get) => ({
         threads: state.threads.filter((t) => t.id !== threadId),
       }));
     } catch (error) {
-      console.error("删除失败:", error);
       throw error;
     }
   },
