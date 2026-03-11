@@ -438,16 +438,12 @@ export async function getThreads(): Promise<ThreadListItem[]> {
   }
 }
 
-// 获取线程详情(xxx: 这里新增了对 "null" 和 "undefined" 字符串的拦截，防止后端收到无效的 threadId)
+// 获取线程详情
 export async function getThreadDetail(threadId: string): Promise<ThreadDetail> {
-  // 👇 新增拦截逻辑：防止把 "null" 或 "undefined" 发给后端
+  // 拦截无效的 threadId
   if (!threadId || threadId === "null" || threadId === "undefined") {
-    console.warn("拦截请求: 暂无 threadId，跳过拉取历史记录");
-    // 这里建议抛出一个特定的错误或者返回一个空结构，取决于你外层调用的 try/catch 怎么处理
-    // 简单点的话，可以直接 throw
-    throw new Error("NO_THREAD_ID"); 
+    throw new Error("NO_THREAD_ID");
   }
-  // 👆 拦截结束
 
   try {
     const res = await axios.get<ApiResponse<ThreadDetail>>(`${API_BASE}/threads/${threadId}`);
@@ -597,52 +593,4 @@ export const processExcel = ({ body, events: { onStart, onMessage, onError, onSu
   const process: ProcessPromise = trigger() as ProcessPromise;
   process.abort = () => controller.abort();
   return process;
-
 }
-
-// export const processExcel = ({ body, events: { onStart, onMessage, onError, onSuccess, onFinally } }: ProcessExcelOptions) => {
-//   const controller = new AbortController();
-
-//   const trigger = async () => {
-//     try {
-//       const res = await fetch(`${API_BASE}/chat`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(body),
-//         signal: controller.signal,
-//       });
-
-//       onStart?.();
-
-//       if (!res.ok) {
-//         throw new Error("请求失败");
-//       }
-
-//       for await (const event of events(res, controller.signal)) {
-//         if (!event.data) {
-//           continue;
-//         }
-//         try {
-//           const data = JSON.parse(event.data);
-//           onMessage?.(data as SSEMessage);
-//         } catch {
-//           // ignore parse errors
-//         }
-//       }
-//       onSuccess?.();
-//     } catch (err) {
-//       const error = err as Error;
-//       if (error.name !== "AbortError") {
-//         onError?.(error);
-//       }
-//     } finally {
-//       onFinally?.();
-//     }
-//   }
-
-//   const process: ProcessPromise = trigger() as ProcessPromise;
-
-//   process.abort = () => controller.abort();
-
-//   return process;
-// }

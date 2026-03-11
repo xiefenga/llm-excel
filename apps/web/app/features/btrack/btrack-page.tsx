@@ -53,7 +53,6 @@ const BTrackPage = () => {
       setIsExporting(true);
       await exportBTracks({ fixed: fixedParam });
     } catch (err) {
-      console.error("导出失败:", err);
       alert((err as Error).message || "导出失败");
     } finally {
       setIsExporting(false);

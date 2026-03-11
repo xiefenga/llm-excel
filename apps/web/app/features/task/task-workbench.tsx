@@ -28,7 +28,7 @@ import {
 import type { PreviewTab } from './preview-panel'
 import type { ChatMessage } from '~/hooks/use-chat'
 import type { ConversationTurn } from './chat-panel'
-import type { AssistantMessage, UserMessage, StepRecord, StepName, StepError, UserMessageAttachment, OutputFileInfo, ExportStepOutput } from '~/components/llm-chat/message-list/types'
+import type { AssistantMessage, UserMessage, StepRecord, StepName, StepError, OutputFileInfo, ExportStepOutput } from '~/components/llm-chat/message-list/types'
 
 export interface TaskWorkbenchProps {
   threadId?: string
@@ -74,9 +74,6 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
       initThreadId.current = thread_id
       navigate(`/threads/${thread_id}`)
       queryClient.invalidateQueries({ queryKey: ['threads'] })
-    } else {
-      // 意图澄清阶段或后端尚未落库时，留在当前无 ID 的状态，直接渲染流式对话即可
-      console.log('当前为意图澄清阶段或暂无 thread_id，跳过路由跳转')
     }
   },
   onExportSuccess: (files) => {

@@ -109,7 +109,6 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSu
       events: {
         onStart,
         onMessage: (event, data) => {
-          console.log(event, data)
           // 处理 session 事件 - 会话元数据
           if (event === "session") {
             const sessionData = data as SessionEventData;
@@ -156,7 +155,6 @@ export const useChat = ({ onStart, initialMessages, onSessionCreated, onExportSu
 
           // 验证步骤名称
           if (!isStepName(step)) {
-            console.warn(`Unknown step: ${step}`);
             return;
           }
 

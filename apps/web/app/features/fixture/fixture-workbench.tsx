@@ -59,8 +59,8 @@ const FixtureWorkbench = ({ scenarioId, caseId }: FixtureWorkbenchProps) => {
         }
         setDatasets(scenario.datasets || [])
         setScenarioName(scenario.name || '')
-      } catch (err) {
-        console.error('Failed to load case info:', err)
+      } catch {
+        // 加载用例信息失败，静默处理
       } finally {
         setLoadingCase(false)
       }
@@ -162,7 +162,7 @@ const FixtureWorkbench = ({ scenarioId, caseId }: FixtureWorkbenchProps) => {
           setResult(data)
         },
         onError: (data: FixtureSSEError) => {
-          console.error('Fixture error:', data.message)
+          // SSE 错误会通过 result 状态显示
         },
         onFinally: () => {
           setIsRunning(false)
