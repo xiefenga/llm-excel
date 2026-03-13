@@ -1,3 +1,6 @@
+docker/minio_data/
+docker/postgres_data/
+
 .turbo
 node_modules
 .env
