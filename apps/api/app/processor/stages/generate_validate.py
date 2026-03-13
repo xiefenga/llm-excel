@@ -1,5 +1,5 @@
 """生成+验证复合阶段"""
-
+import re
 import json
 import logging
 from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
@@ -191,20 +191,27 @@ class GenerateValidateStage(Stage):
                 enhanced_query = f"{processing_context}\n\n当前请求：{query}"
 
             if config.stream_llm:
-                # 流式调用
                 operations_json = ""
+                accumulated_text = ""
+                
                 for delta, full_content in self.llm_client.generate_operations_stream(
-                    enhanced_query, analysis, schemas,
-                    previous_errors=previous_errors,
+                    query, analysis, schemas,
+                    previous_errors=validation_errors,
                     previous_json=previous_json,
                 ):
-                    operations_json = full_content
-                    yield self._create_event(
-                        ProcessStage.GENERATE, EventType.STAGE_STREAM,
-                        stage_id=stage_id, delta=delta
-                    )
+                    if delta:
+                        accumulated_text += delta
+
+                    if full_content and full_content.strip():
+                        operations_json = full_content
+                        
+                    yield self._event_stream(delta, stage_id)
+
+                if not operations_json.strip():
+                    operations_json = accumulated_text
+                    
+                # 清理 JSON 响应
                 operations_json = self._clean_json_response(operations_json)
-            else:
                 # 非流式调用
                 operations_json = self.llm_client.generate_operations(
                     enhanced_query, analysis, schemas,
@@ -305,15 +312,17 @@ class GenerateValidateStage(Stage):
         return file_sheets
 
     def _clean_json_response(self, content: str) -> str:
-        """清理 LLM 响应中可能存在的 markdown 标记"""
+        """清理 LLM 响应中可能存在的思考过程、XML 标签和 markdown 标记"""
         content = content.strip()
 
-        if content.startswith("```json"):
-            content = content[7:]
-        elif content.startswith("```"):
-            content = content[3:]
+        match = re.search(r"<SELGETABEL_EXCEL_IR_OUTPUT>\s*(.*?)\s*</SELGETABEL_EXCEL_IR_OUTPUT>", content, re.DOTALL | re.IGNORECASE)
+        target_str = match.group(1) if match else content
 
-        if content.endswith("```"):
-            content = content[:-3]
+        start_idx = target_str.find('{')
+        end_idx = target_str.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx >= start_idx:
+            clean_str = target_str[start_idx:end_idx+1]
+        else:
+            clean_str = target_str.strip()
 
-        return content.strip()
+        return clean_str
