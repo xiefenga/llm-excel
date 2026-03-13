@@ -54,14 +54,19 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 
 ## 输出格式
 
-```json
+你可以在输出 JSON 之前进行自由的思考和逻辑推演。
+但是，你最终生成的操作配置 **必须且只能** 包含在 `<SELGETABEL_EXCEL_IR_OUTPUT>` 和 `</SELGETABEL_EXCEL_IR_OUTPUT>` 标签之中。标签内必须是严格合法的 JSON 格式。
+
+示例输出：
+用户想要计算总和，我需要使用 aggregate 动作。
+<SELGETABEL_EXCEL_IR_OUTPUT>
 {
   "operations": [
     { 操作1 },
     { 操作2 }
   ]
 }
-```
+</SELGETABEL_EXCEL_IR_OUTPUT>
 
 ## 操作类型
 
