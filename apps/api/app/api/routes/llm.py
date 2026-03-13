@@ -860,12 +860,23 @@ async def test_provider(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+    # 4.5 查询模型配置获取 defaults
+    model_result = await db.execute(
+        select(LLMModel)
+        .where(LLMModel.provider_id == provider.id)
+        .where(LLMModel.model_id == payload.model_id)
+    )
+    db_model = model_result.scalar_one_or_none()
+
+    model_defaults = db_model.defaults if db_model and db_model.defaults else {}
+
     # 5. 构造 LLMRequest
     request = LLMRequest(
         model_id=payload.model_id,
         messages=payload.messages,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
+        extra_params=model_defaults
     )
 
     # 6. 根据 stream 模式返回

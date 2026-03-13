@@ -69,7 +69,7 @@ const { messages, sendMessage, setMessages, clearMessages, isProcessing } = useC
     setTaskState('processing')
   },
   onSessionCreated: ({ thread_id }) => {
-    // 👇 修复：严格判断 thread_id 是否有效
+    //严格判断 thread_id 是否有效
     if (thread_id && thread_id !== 'null' && thread_id !== 'undefined') {
       initThreadId.current = thread_id
       navigate(`/threads/${thread_id}`)
