@@ -6,9 +6,9 @@ import { reactRouter } from "@react-router/dev/vite";
 
 export default defineConfig(({ mode }) => {
 
-  const envs = loadEnv('development', process.cwd(), '')
+  const envs = loadEnv(mode, process.cwd(), '')
 
-  const API_BASE_URL = envs.API_BASE_URL;
+  const API_BASE_URL = envs.API_BASE_URL || "http://localhost:8000";
 
   return {
     plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), svgr()],

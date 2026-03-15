@@ -16,6 +16,7 @@ RUN pnpm install --frozen-lockfile --filter web...
 
 FROM deps AS build
 
+
 COPY apps/web/ /repo/apps/web/
 
 RUN pnpm --filter web build

@@ -12,6 +12,7 @@ from app.schemas.response import ApiResponse
 from app.core.database import get_db
 from app.core.init_permissions import init_permissions
 from app.core.version_check import verify_versions_on_startup
+from app.core.branding import get_product_name, get_product_description
 
 # 导入版本信息
 try:
@@ -41,7 +42,7 @@ OPENAPI_DESCRIPTION = """
 async def lifespan(app: FastAPI):
     """应用生命周期"""
     # 启动时初始化权限系统
-    print(f"Selgetabel API v{__version__}  {__build_time__}")
+    print(f"{get_product_name()} API v{__version__}  {__build_time__}")
 
     yield
 
@@ -119,7 +120,7 @@ async def get_version():
     """获取应用版本信息"""
     return {
         "app": {
-            "name": "Selgetabel",
+            "name": get_product_name(),
             "version": __version__,
             "build_time": __build_time__,
         }

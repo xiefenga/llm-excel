@@ -10,6 +10,7 @@ from app.core.database import AsyncSessionLocal
 from app.api.deps import get_llm_client
 from app.persistence.turn_repository import TurnRepository
 from app.models.thread import Thread, ThreadTurn
+from app.core.branding import get_product_name, get_product_description
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +18,21 @@ logger = logging.getLogger(__name__)
 class ChatService:
     """
     聊天服务
-    
+
     处理纯文本对话，不涉及文件处理。
     支持多轮对话，维护对话历史。
     """
-    
-    # 聊天系统提示词
-    CHAT_SYSTEM_PROMPT = """你是 Selgetabel 的 AI 助手。
 
-## 关于 Selgetabel
-Selgetabel 是一款 AI 驱动的 Excel 智能处理系统。用户只需用自然语言描述数据处理需求，AI 即可生成可执行操作并输出带有公式的 Excel 文件，结果 100% 可复现，告别繁琐的公式编写。
+    @staticmethod
+    def _get_chat_system_prompt() -> str:
+        """获取聊天系统提示词"""
+        product_name = get_product_name()
+        product_desc = get_product_description()
+
+        return f"""你是 {product_name} 的 AI 助手。
+
+## 关于 {product_name}
+{product_desc}。用户只需用自然语言描述数据处理需求，AI 即可生成可执行操作并输出带有公式的 Excel 文件，结果 100% 可复现，告别繁琐的公式编写。
 
 核心能力：
 - 自然语言 → 结构化 JSON 操作 → Excel 公式，全程自动化
@@ -34,7 +40,7 @@ Selgetabel 是一款 AI 驱动的 Excel 智能处理系统。用户只需用自�
 - 输出的 Excel 文件保留完整公式，可审计、可复现
 
 ## 你的角色
-1. 解答关于 Selgetabel 功能和使用方式的问题
+1. 解答关于 {product_name} 功能和使用方式的问题
 2. 引导用户高效地描述数据处理需求
 3. 回答一般性的 Excel 和数据处理技术问题
 4. 保持友好、专业、简洁的语气
@@ -43,6 +49,11 @@ Selgetabel 是一款 AI 驱动的 Excel 智能处理系统。用户只需用自�
 1. 如果用户想要处理数据但尚未上传文件，提醒他们先上传 Excel 文件
 2. 如果问题超出你的知识范围，如实告知
 3. 使用中文回答，除非用户明确要求其他语言"""
+
+    @property
+    def CHAT_SYSTEM_PROMPT(self) -> str:
+        """动态获取聊天系统提示词"""
+        return self._get_chat_system_prompt()
 
     def __init__(self, llm_client: LLMClient, context_builder: Optional[ContextBuilder] = None):
         """

@@ -72,16 +72,16 @@ Selgetabel 品牌视觉融合两个核心概念：
 
 基于 shadcn/UI 的中性灰色系，使用 OKLCH 色彩空间。
 
-| 用途                 | CSS 变量             | 亮色模式            | 深色模式              |
-| -------------------- | -------------------- | ------------------- | --------------------- |
-| **Background**       | `--background`       | `oklch(1 0 0)`      | `oklch(0.145 0 0)`   |
-| **Foreground**       | `--foreground`       | `oklch(0.145 0 0)`  | `oklch(0.985 0 0)`   |
-| **Card**             | `--card`             | `oklch(1 0 0)`      | `oklch(0.205 0 0)`   |
-| **Muted**            | `--muted`            | `oklch(0.97 0 0)`   | `oklch(0.269 0 0)`   |
-| **Muted Foreground** | `--muted-foreground` | `oklch(0.556 0 0)`  | `oklch(0.708 0 0)`   |
-| **Border**           | `--border`           | `oklch(0.922 0 0)`  | `oklch(1 0 0 / 10%)` |
-| **Input**            | `--input`            | `oklch(0.922 0 0)`  | —                     |
-| **Ring**             | `--ring`             | `oklch(0.708 0 0)`  | —                     |
+| 用途                 | CSS 变量             | 亮色模式           | 深色模式             |
+| -------------------- | -------------------- | ------------------ | -------------------- |
+| **Background**       | `--background`       | `oklch(1 0 0)`     | `oklch(0.145 0 0)`   |
+| **Foreground**       | `--foreground`       | `oklch(0.145 0 0)` | `oklch(0.985 0 0)`   |
+| **Card**             | `--card`             | `oklch(1 0 0)`     | `oklch(0.205 0 0)`   |
+| **Muted**            | `--muted`            | `oklch(0.97 0 0)`  | `oklch(0.269 0 0)`   |
+| **Muted Foreground** | `--muted-foreground` | `oklch(0.556 0 0)` | `oklch(0.708 0 0)`   |
+| **Border**           | `--border`           | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` |
+| **Input**            | `--input`            | `oklch(0.922 0 0)` | —                    |
+| **Ring**             | `--ring`             | `oklch(0.708 0 0)` | —                    |
 
 ### 2.4 图表色
 
@@ -117,8 +117,9 @@ Selgetabel 品牌视觉融合两个核心概念：
 ## 3. 字体系统
 
 ```css
---font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-  "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+--font-sans:
+  "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+  "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 ```
 
 | 用途         | 类名                            | 字重 | 大小            |
@@ -184,11 +185,11 @@ Selgetabel 品牌视觉融合两个核心概念：
 
 ## 6. 阴影系统
 
-| Token       | 用途       |
-| ----------- | ---------- |
+| Token       | 用途         |
+| ----------- | ------------ |
 | `shadow-sm` | 卡片、Header |
-| `shadow-md` | 下拉菜单   |
-| `shadow-lg` | 模态框     |
+| `shadow-md` | 下拉菜单     |
+| `shadow-lg` | 模态框       |
 
 ---
 
@@ -274,12 +275,12 @@ Selgetabel 品牌视觉融合两个核心概念：
 
 ### 变体
 
-| 类名              | 用途             |
-| ----------------- | ---------------- |
-| `scrollbar-thin`  | 侧边栏（6px）   |
-| `scrollbar-none`  | 隐藏滚动条       |
-| `scrollbar-hover` | 悬停时显示       |
-| `scrollbar-brand` | 品牌色滚动条     |
+| 类名              | 用途          |
+| ----------------- | ------------- |
+| `scrollbar-thin`  | 侧边栏（6px） |
+| `scrollbar-none`  | 隐藏滚动条    |
+| `scrollbar-hover` | 悬停时显示    |
+| `scrollbar-brand` | 品牌色滚动条  |
 
 Firefox 仅支持 `scrollbar-width: thin` 和 `scrollbar-color`，无法自定义圆角。
 

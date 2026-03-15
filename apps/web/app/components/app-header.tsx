@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { Logo } from "~/components/logo";
 import { Button } from "~/components/ui/button";
 import { UserMenu } from "~/components/user-menu";
+import { getProductName } from "~/lib/branding";
 
 interface Props {
   sidebarOpen: boolean;
@@ -43,7 +44,7 @@ const AppHeader = ({ sidebarOpen, onSidebarOpenChange, isThreadPage = false }: P
           <div className="flex items-center gap-1">
             <Logo size={36} />
             <h1 className="text-2xl font-bold bg-linear-to-r from-emerald-700 via-teal-700 to-blue-700 bg-clip-text text-transparent">
-              Selgetabel
+              {getProductName()}
             </h1>
           </div>
         </div>
