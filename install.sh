@@ -199,7 +199,8 @@ initialize() {
     # Step 4: Run database migrations
     print_info "Running database migrations..."
     # [MODIFIED]: Added error handling for migration in case it fails partially
-    if ! docker compose run --rm api uv run alembic upgrade head; then
+    # Added -T flag to disable TTY allocation for non-interactive script execution (e.g., curl | bash)
+    if ! docker compose run -T --rm api uv run alembic upgrade head; then
         print_error "Database migrations failed. Check logs above."
         exit 1
     fi
