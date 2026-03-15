@@ -15,12 +15,12 @@
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
+| 层级 | 技术                                            |
+| ---- | ----------------------------------------------- |
 | 前端 | React Router v7、Vite、TypeScript、Tailwind CSS |
-| 后端 | Python FastAPI、多 LLM Provider 支持 |
-| 存储 | PostgreSQL、MinIO（S3 兼容） |
-| 基建 | pnpm workspace、Turborepo、Docker Compose |
+| 后端 | Python FastAPI、多 LLM Provider 支持            |
+| 存储 | PostgreSQL、MinIO（S3 兼容）                    |
+| 基建 | pnpm workspace、Turborepo、Docker Compose       |
 
 ## 快速开始（Docker 部署）
 
@@ -86,10 +86,10 @@ pnpm --filter @selgetabel/api install
 pnpm dev
 ```
 
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://localhost:5173 |
-| API | http://localhost:8000 |
+| 服务     | 地址                       |
+| -------- | -------------------------- |
+| 前端     | http://localhost:5173      |
+| API      | http://localhost:8000      |
 | API 文档 | http://localhost:8000/docs |
 
 ### 常用命令
@@ -141,15 +141,15 @@ selgetabel/
 
 **已支持的供应商：**
 
-| 供应商 | 类型标识 | 状态 |
-|--------|---------|------|
-| OpenAI | `openai` | 可用 |
-| OpenAI 兼容 | `openai_compatible` | 可用 |
-| Anthropic | `anthropic` | 规划中 |
-| Azure OpenAI | `azure_openai` | 规划中 |
-| DeepSeek | `deepseek` | 规划中 |
-| Qwen（通义千问） | `qwen` | 规划中 |
-| Ollama | `ollama` | 规划中 |
+| 供应商           | 类型标识            | 状态   |
+| ---------------- | ------------------- | ------ |
+| OpenAI           | `openai`            | 可用   |
+| OpenAI 兼容      | `openai_compatible` | 可用   |
+| Anthropic        | `anthropic`         | 规划中 |
+| Azure OpenAI     | `azure_openai`      | 规划中 |
+| DeepSeek         | `deepseek`          | 规划中 |
+| Qwen（通义千问） | `qwen`              | 规划中 |
+| Ollama           | `ollama`            | 规划中 |
 
 **阶段级路由** —— 不同处理阶段（分析、生成、标题）可使用不同的供应商/模型组合。
 
@@ -170,19 +170,19 @@ selgetabel/
 
 ### 支持的操作
 
-| 操作 | 说明 |
-|------|------|
-| `aggregate` | 列聚合（SUM、AVERAGE、SUMIF 等） |
-| `add_column` | 添加带公式的计算列 |
-| `update_column` | 更新已有列的值 |
-| `compute` | 基于变量的标量计算 |
-| `filter` | 按条件筛选行 |
-| `sort` | 按列排序 |
-| `group_by` | 分组聚合 |
-| `take` | 限制行数 |
-| `select_columns` | 选择特定列 |
-| `drop_columns` | 删除列 |
-| `create_sheet` | 创建新工作表 |
+| 操作             | 说明                             |
+| ---------------- | -------------------------------- |
+| `aggregate`      | 列聚合（SUM、AVERAGE、SUMIF 等） |
+| `add_column`     | 添加带公式的计算列               |
+| `update_column`  | 更新已有列的值                   |
+| `compute`        | 基于变量的标量计算               |
+| `filter`         | 按条件筛选行                     |
+| `sort`           | 按列排序                         |
+| `group_by`       | 分组聚合                         |
+| `take`           | 限制行数                         |
+| `select_columns` | 选择特定列                       |
+| `drop_columns`   | 删除列                           |
+| `create_sheet`   | 创建新工作表                     |
 
 ## 相关文档
 

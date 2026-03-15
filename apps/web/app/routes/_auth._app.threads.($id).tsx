@@ -1,10 +1,11 @@
 import TaskWorkbench from '~/features/task/task-workbench'
+import { getProductName } from '~/lib/branding'
 
 import type { Route } from './+types/_auth._app.threads.($id)'
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: '任务处理 - Selgetabel' },
+    { title: `任务处理 - ${getProductName()}` },
     { name: 'description', content: '使用 LLM 处理 Excel 数据' },
   ]
 }

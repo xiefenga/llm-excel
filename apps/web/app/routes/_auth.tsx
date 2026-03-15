@@ -3,12 +3,13 @@ import { Loader2 } from "lucide-react";
 import { useNavigate, Outlet } from "react-router";
 
 import { useCurrentUser } from "~/hooks/use-current-user";
+import { getProductName } from "~/lib/branding";
 
 import type { Route } from "./+types/_auth";
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "Selgetabel" },
+    { title: getProductName() },
     { name: "description", content: "使用 LLM 处理 Excel 数据" },
   ];
 }

@@ -9,13 +9,14 @@ import { Field, FieldContent, FieldError, FieldLabel } from "~/components/ui/fie
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 
 import { register as registerUser } from "~/api/auth";
+import { getProductName } from "~/lib/branding";
 
 import type { Route } from "./+types/_public.register";
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "注册 - Selgetabel" },
-    { name: "description", content: "注册 Selgetabel 账户" },
+    { title: `注册 - ${getProductName()}` },
+    { name: "description", content: `注册 ${getProductName()} 账户` },
   ];
 }
 

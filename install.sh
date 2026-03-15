@@ -16,6 +16,10 @@ BRANCH="main"
 TARGET_DIR="docker"
 EXCLUDED_FILES=("scripts" "docker-compose.build.yml" "docker-compose.dev.yml")
 
+# Default options
+IMAGE_VERSION="latest"
+WEB_PORT="8080"
+
 # Print functions
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -32,6 +36,41 @@ print_error() {
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
+
+# Show help
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --version TAG   Specify image version (default: latest)"
+    echo "  --port PORT     Specify web service port (default: 8080)"
+    echo "  -h, --help      Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  curl -fsSL https://raw.githubusercontent.com/xiefenga/selgetabel/main/install.sh | bash"
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --version)
+            IMAGE_VERSION="$2"
+            shift 2
+            ;;
+        --port)
+            WEB_PORT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            show_help
+            ;;
+    esac
+done
 
 # Check if command exists
 command_exists() {
@@ -80,6 +119,19 @@ load_env_var() {
     local value
     value=$(grep -E "^${var_name}=" ./.env 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'")
     echo "${value:-$default_value}"
+}
+
+# Set environment variable in .env file (replace or append)
+set_env_var() {
+    local var_name="$1"
+    local var_value="$2"
+    local env_file="${3:-./.env}"
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/^${var_name}=.*/${var_name}=${var_value}/" "$env_file" 2>/dev/null || echo "${var_name}=${var_value}" >> "$env_file"
+    else
+        sed -i "s/^${var_name}=.*/${var_name}=${var_value}/" "$env_file" 2>/dev/null || echo "${var_name}=${var_value}" >> "$env_file"
+    fi
 }
 
 # Wait for a service to become healthy
@@ -328,12 +380,16 @@ setup_env() {
         local current_jwt=$(grep -E "^JWT_SECRET_KEY=" ./.env | cut -d'=' -f2-)
         if [ -z "$current_jwt" ]; then
             local jwt_key=$(openssl rand -hex 32)
-            sed -i.bak "s|^JWT_SECRET_KEY=.*|JWT_SECRET_KEY=${jwt_key}|" ./.env
-            rm -f ./.env.bak
+            set_env_var "JWT_SECRET_KEY" "$jwt_key"
             print_success "JWT_SECRET_KEY generated automatically."
         else
             print_info "JWT_SECRET_KEY already set, skipping..."
         fi
+
+        # Set IMAGE_VERSION and WEB_PORT
+        set_env_var "IMAGE_VERSION" "$IMAGE_VERSION"
+        set_env_var "WEB_PORT" "$WEB_PORT"
+
     fi
 }
 
@@ -344,6 +400,11 @@ print_next_steps() {
     echo -e "${GREEN}  Installation completed successfully!${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo ""
+
+        echo -e "${BLUE}Version: Selgetabel${NC}"
+    echo -e "${BLUE}Image Version: ${IMAGE_VERSION}${NC}"
+    echo -e "${BLUE}Web Port: ${WEB_PORT}${NC}"
+    echo ""
     echo -e "${BLUE}Next steps:${NC}"
     echo ""
     echo "1. Start the application:"
@@ -352,8 +413,8 @@ print_next_steps() {
     echo "2. Configure LLM provider in the web UI settings."
     echo ""
     echo "3. Access the application:"
-    echo "   - Web UI: http://localhost:8080"
-    echo "   - API: http://localhost:8080/api"
+    echo "   - Web UI: http://localhost:${WEB_PORT}"
+    echo "   - API: http://localhost:${WEB_PORT}/api"
     echo ""
     echo "For more information, visit:"
     echo "https://github.com/${REPO_OWNER}/${REPO_NAME}"
@@ -363,9 +424,13 @@ print_next_steps() {
 # Main function
 main() {
     echo ""
-    echo -e "${BLUE}======================================${NC}"
-    echo -e "${BLUE}  Selgetabel Quick Installation${NC}"
-    echo -e "${BLUE}======================================${NC}"
+        echo -e "${BLUE}======================================${NC}"
+        echo -e "${BLUE}  Selgetabel Quick Installation${NC}"
+        echo -e "${BLUE}======================================${NC}"
+    echo ""
+    echo -e "${BLUE}Configuration:${NC}"
+    echo "  Image Version: ${IMAGE_VERSION}"
+    echo "  Web Port: ${WEB_PORT}"
     echo ""
 
     check_dependencies

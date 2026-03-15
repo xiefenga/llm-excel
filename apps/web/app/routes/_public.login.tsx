@@ -11,13 +11,14 @@ import { Field, FieldContent, FieldError, FieldLabel } from "~/components/ui/fie
 
 import { login } from "~/api/auth";
 import { useAuthStore } from "~/stores/auth";
+import { getProductName } from "~/lib/branding";
 
 import type { Route } from "./+types/_public.login";
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "登录 - Selgetabel" },
-    { name: "description", content: "登录到 Selgetabel 系统" },
+    { title: `登录 - ${getProductName()}` },
+    { name: "description", content: `登录到 ${getProductName()} 系统` },
   ];
 }
 

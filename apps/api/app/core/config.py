@@ -65,4 +65,5 @@ class Settings(BaseSettings):
     LLM_SECRET_KEY: Optional[str] = None
 
 
+
 settings = Settings()

@@ -4,12 +4,13 @@ import { useMemo } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Logo } from "~/components/logo";
+import { getProductName, getProductDescription } from "~/lib/branding";
 
 import type { Route } from "./+types/$";
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "404 - Selgetabel" },
+    { title: `404 - ${getProductName()}` },
     { name: "description", content: "页面不存在" },
   ];
 }
@@ -342,7 +343,7 @@ const NotFoundPage = () => {
       >
         <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
           <span className="inline-block size-2 rounded-full bg-brand/60" />
-          <span className="font-medium">Selgetabel · AI 驱动的 Excel 智能处理</span>
+          <span className="font-medium">{getProductName()} · {getProductDescription()}</span>
         </div>
       </footer>
     </main>

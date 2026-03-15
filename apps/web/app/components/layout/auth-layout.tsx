@@ -1,4 +1,5 @@
 import { Logo } from "~/components/logo";
+import { getProductName, getProductFooter } from "~/lib/branding";
 
 import type { PropsWithChildren } from "react";
 
@@ -59,7 +60,7 @@ export const AuthLayout = ({ children }: PropsWithChildren) => {
           >
             <Logo size={45} />
             <h1 className="text-3xl font-bold bg-linear-to-r from-emerald-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
-              Selgetabel
+              {getProductName()}
             </h1>
           </div>
 
@@ -101,7 +102,7 @@ export const AuthLayout = ({ children }: PropsWithChildren) => {
               opacity: 0,
             }}
           >
-            © 2026 Selgetabel. 让数据处理更简单。
+            © 2026 {getProductName()}. {getProductFooter()}
           </div>
         </div>
       </div>
@@ -129,7 +130,7 @@ export const AuthLayout = ({ children }: PropsWithChildren) => {
           <div className="flex items-center gap-2">
             <Logo size={40} />
             <h1 className="text-2xl font-bold bg-linear-to-r from-emerald-600 via-teal-600 to-blue-600 bg-clip-text text-transparent">
-              Selgetabel
+              {getProductName()}
             </h1>
           </div>
         </header>
@@ -148,7 +149,7 @@ export const AuthLayout = ({ children }: PropsWithChildren) => {
 
         {/* Mobile Footer */}
         <footer className="lg:hidden px-6 py-4 text-center text-gray-400 text-sm">
-          © 2026 Selgetabel
+          © 2026 {getProductName()}
         </footer>
       </div>
     </div>

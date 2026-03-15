@@ -3,9 +3,8 @@ services:
     image: 0x1461a0/selgetabel-api:${IMAGE_VERSION:-latest}
     entrypoint: [] # <--- 新增这一行，强制忽略镜像内错误的入口点
     restart: unless-stopped
-    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-llmexcel}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-llmexcel}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -34,7 +33,7 @@ services:
       start_period: 30s
 
   web:
-    image: 0x1461a0/selgetabel-web:${IMAGE_VERSION:-latest}
+    image: 0x1461a0/${WEB_IMAGE:-selgetabel-web}:${IMAGE_VERSION:-latest}
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -62,9 +61,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-llmexcel}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-llmexcel}
-    # 生产环境不建议暴露端口
-    # ports:
-    #   - "5432:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
@@ -85,10 +81,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    # 生产环境不建议暴露端口或使用内网访问
-    # ports:
-    #   - 9000:9000
-    #   - 9001:9001
     command: server /data --console-address ":9001"
     volumes:
       - ./minio_data:/data
