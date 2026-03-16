@@ -37,8 +37,8 @@
 │                                                                     │
 │   ExcelProcessor.process(tables, query, config)                    │
 │                                                                     │
-│   ┌────────────────────────────┐    ┌─────────┐                   │
-│   │   GenerateValidateStage    │ → │ execute │                   │
+│   ┌────────────────────────────┐    ┌──────────────┐              │
+│   │   GenerateValidateStage    │ → │ ExecuteStage │              │
 │   │  ┌────────┐  ┌──────────┐ │    └─────────┘                   │
 │   │  │generate│→│ validate │ │                                   │
 │   │  └────────┘  └──────────┘ │                                   │
@@ -224,10 +224,9 @@ apps/api/app/
 │   ├── __init__.py
 │   ├── types.py                  # ProcessStage, EventType, ProcessEvent, etc.
 │   ├── excel_processor.py        # ExcelProcessor 实现
-│   └── stages/                   # 各阶段实现
-│       ├── __init__.py
-│       ├── generate.py           # GenerateStage（单独使用）
-│       ├── validate.py           # ValidateStage（单独使用）
+│   └── stages/                   # 主链路阶段实现
+│       ├── __init__.py           # 仅导出当前主链路阶段
+│       ├── errors.py             # StageError 定义
 │       ├── generate_validate.py  # GenerateValidateStage（复合阶段）
 │       └── execute.py            # ExecuteStage
 ├── engine/                       # 引擎层（Layer 3）：核心原子操作
@@ -250,3 +249,12 @@ apps/api/app/
     ├── chat.py                   # Chat API：使用 ExcelProcessor
     └── fixture.py                # Fixture API
 ```
+
+## 当前阶段导出
+
+`app.processor.stages` 当前只导出主链路需要的两个阶段：
+
+- `GenerateValidateStage`
+- `ExecuteStage`
+
+`StageError` 已从阶段实现中抽离到 `app.processor.stages.errors`，避免异常类型依赖某个已废弃阶段文件。
