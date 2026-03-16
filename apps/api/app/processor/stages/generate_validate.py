@@ -6,7 +6,7 @@ from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
 
 from ..types import ProcessStage, EventType, ProcessEvent, ProcessConfig
 from .base import Stage
-from .analyze import StageError
+from .errors import StageError
 
 if TYPE_CHECKING:
     from app.engine.models import FileCollection
@@ -196,7 +196,7 @@ class GenerateValidateStage(Stage):
                 
                 for delta, full_content in self.llm_client.generate_operations_stream(
                     query, analysis, schemas,
-                    previous_errors=validation_errors,
+                    previous_errors=previous_errors,
                     previous_json=previous_json,
                 ):
                     if delta:
@@ -212,6 +212,7 @@ class GenerateValidateStage(Stage):
                     
                 # 清理 JSON 响应
                 operations_json = self._clean_json_response(operations_json)
+            else:
                 # 非流式调用
                 operations_json = self.llm_client.generate_operations(
                     enhanced_query, analysis, schemas,
