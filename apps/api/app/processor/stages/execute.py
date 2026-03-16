@@ -5,7 +5,7 @@ from typing import Any, Dict, Generator, List, TYPE_CHECKING
 
 from ..types import ProcessStage, ProcessEvent, ProcessConfig
 from .base import Stage
-from .analyze import StageError
+from .errors import StageError
 
 if TYPE_CHECKING:
     from app.engine.models import FileCollection

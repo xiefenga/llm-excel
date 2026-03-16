@@ -11,7 +11,7 @@ from .types import (
     ProcessResult,
 )
 from .stages import GenerateValidateStage, ExecuteStage
-from .stages.analyze import StageError
+from .stages.errors import StageError
 
 if TYPE_CHECKING:
     from app.engine.models import FileCollection
