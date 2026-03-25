@@ -114,7 +114,21 @@ async def get_thread_detail(thread_id: str, current_user: User = Depends(get_cur
             raise HTTPException(status_code=400, detail="无效的 thread_id 格式")
 
         # 查询线程
-        stmt = select(Thread).where(Thread.id == thread_id_uuid).where(Thread.user_id == current_user.id)
+        stmt = select(Thread).where(Thread.id == thread_id_uuid)
+        can_view_all = await has_permission(
+            current_user,
+            db,
+            Permissions.THREAD_READ_ALL
+        )
+        if not can_view_all:
+            stmt = stmt.where(Thread.user_id == current_user.id)
+
+        result = await db.execute(stmt)
+        thread = result.scalar_one_or_none()
+
+        if not thread:
+            raise HTTPException(status_code=404, detail="线程不存在或无权访问")
+
         result = await db.execute(stmt)
         thread = result.scalar_one_or_none()
 

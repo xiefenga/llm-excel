@@ -23,6 +23,7 @@ dependencies = [
     "bcrypt>=4.0.0",
     "email-validator>=2.0.0",  # Pydantic EmailStr 需要
     "minio>=7.2.10",
+    "xlrd==2.0.1",
 ]
 [project.scripts]
 dev = "uvicorn app.main:app --reload --host localhost --port 8000"

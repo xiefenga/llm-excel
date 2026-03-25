@@ -47,9 +47,10 @@ class ExcelParser:
         if table_name is None:
             table_name = file_path.stem  # 使用文件名（不含扩展名）
 
+        engine = 'xlrd' if file_path.suffix.lower() == '.xls' else 'openpyxl'
         # 读取 Excel 文件（读取第一个 sheet）
         try:
-            df = pd.read_excel(file_path, engine='openpyxl')
+            df = pd.read_excel(file_path, engine=engine)
         except Exception as e:
             raise ValueError(f"读取 Excel 文件失败: {str(e)}") from e
 
@@ -79,8 +80,9 @@ class ExcelParser:
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
         # 读取所有 sheets
+        engine = 'xlrd' if file_path.suffix.lower() == '.xls' else 'openpyxl'
         try:
-            excel_file_data = pd.ExcelFile(file_path, engine='openpyxl')
+            excel_file_data = pd.ExcelFile(file_path, engine=engine)
             all_sheet_names = excel_file_data.sheet_names
         except Exception as e:
             raise ValueError(f"读取 Excel 文件失败: {str(e)}") from e
@@ -107,7 +109,7 @@ class ExcelParser:
 
         # 解析每个 sheet
         for sheet_name in sheets_to_parse:
-            df = pd.read_excel(file_path, sheet_name=sheet_name, engine='openpyxl')
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
             df = ExcelParser._clean_dataframe(df)
 
             # 使用 sheet 名称作为表名
@@ -192,7 +194,9 @@ class ExcelParser:
             # 使用 pandas 解析 Excel 内容
             try:
                 excel_bytes = io.BytesIO(data)
-                excel_file_data = pd.ExcelFile(excel_bytes, engine="openpyxl")
+                file_suffix = Path(filename).suffix.lower()
+                engine = 'xlrd' if file_suffix == '.xls' else 'openpyxl'
+                excel_file_data = pd.ExcelFile(excel_bytes, engine=engine)
                 sheet_names = excel_file_data.sheet_names
 
                 # 创建 ExcelFile 对象
@@ -203,7 +207,7 @@ class ExcelParser:
                     df = pd.read_excel(
                         excel_file_data,
                         sheet_name=sheet_name,
-                        engine="openpyxl",
+                        engine=engine,
                     )
                     df = ExcelParser._clean_dataframe(df)
                     table = Table(name=sheet_name, data=df)
@@ -281,18 +285,17 @@ class ExcelParser:
         if not file_path.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
+        engine = 'xlrd' if file_path.suffix.lower() == '.xls' else 'openpyxl'
         try:
-            excel_file = pd.ExcelFile(file_path, engine='openpyxl')
-
+            excel_file = pd.ExcelFile(file_path, engine=engine)
             sheets_info = {}
             for sheet_name in excel_file.sheet_names:
-                df = pd.read_excel(file_path, sheet_name=sheet_name, engine='openpyxl')
+                df = pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
                 sheets_info[sheet_name] = {
                     "rows": len(df),
                     "columns": len(df.columns),
                     "column_names": list(df.columns)
                 }
-
             return {
                 "file_name": file_path.name,
                 "file_size": file_path.stat().st_size,
