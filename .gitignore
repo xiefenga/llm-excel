@@ -12,6 +12,7 @@ apps/web/app/__version__.ts
 # Docker 数据目录（保留 README 和 .gitkeep）
 docker/db_data/*.sql
 docker/minio_data/*
+docker/backup_data/*
 !docker/minio_data/README.md
 !docker/minio_data/.gitkeep
 !docker/minio_data/default_avatar.png
