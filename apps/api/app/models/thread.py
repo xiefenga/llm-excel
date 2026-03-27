@@ -32,6 +32,8 @@ class Thread(Base):
     )
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False, index=True)
+    # 健康状态：normal（正常）/ error（异常），当任意 turn 发生错误时更新
+    health_status: Mapped[str] = mapped_column(String(20), default="normal", nullable=False, index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

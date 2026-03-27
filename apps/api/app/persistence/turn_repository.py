@@ -327,12 +327,16 @@ class TurnRepository:
         thread = thread_result.scalar_one_or_none()
         if thread:
             thread.updated_at = now
+            # 检查是否有错误步骤，如有则标记为异常
+            if tracker.has_error():
+                thread.health_status = "error"
 
         await self.db.flush()
 
     async def mark_failed(
         self,
         turn_id: UUID,
+        thread_id: UUID,
         tracker: StepTracker,
     ) -> None:
         """
@@ -340,6 +344,7 @@ class TurnRepository:
 
         Args:
             turn_id: Turn ID
+            thread_id: Thread ID（用于更新线程健康状态）
             tracker: 步骤追踪器
         """
         stmt = select(ThreadTurn).where(ThreadTurn.id == turn_id)
@@ -349,7 +354,15 @@ class TurnRepository:
             turn.status = "failed"
             turn.steps = make_json_serializable(tracker.to_list())
             flag_modified(turn, "steps")
-            await self.db.flush()
+
+        # 更新线程健康状态为异常
+        thread_stmt = select(Thread).where(Thread.id == thread_id)
+        thread_result = await self.db.execute(thread_stmt)
+        thread = thread_result.scalar_one_or_none()
+        if thread:
+            thread.health_status = "error"
+
+        await self.db.flush()
 
     async def update_context_snapshot(
         self,

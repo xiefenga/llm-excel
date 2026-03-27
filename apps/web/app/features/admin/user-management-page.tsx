@@ -5,13 +5,14 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, MessageSquare, File, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router";
 import dayjs from "dayjs";
 
 import { getUsers, getRoles, getUserRoles, assignRoles, type UserListItem } from "~/lib/permission-api";
+import { getUserThreadStats, getUserDetail, type UserDetail } from "~/lib/api";
 import { usePermission } from "~/hooks/use-permission";
-import { Permissions } from "~/lib/permissions";
+import UserInfoCard from "./user-info-card";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -25,24 +26,23 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Label } from "~/components/ui/label";
 
 const UserManagementPage = () => {
   const [offset, setOffset] = useState(0);
-  const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+  const [statsUser, setStatsUser] = useState<UserListItem | null>(null);
 
   const limit = 20;
   const queryClient = useQueryClient();
 
-  const canManageUsers = usePermission(Permissions.USER_READ);
-  const canAssignRoles = usePermission(Permissions.USER_ASSIGN_ROLE);
+  const canManageUsers = usePermission("user:read");
+  const canAssignRoles = usePermission("user:assign_role");
+  const canViewThreads = usePermission("thread:read:all");
+  const canViewFiles = usePermission("file:read:all");
 
   const { data: usersData, isLoading: usersLoading, isError: usersError } = useQuery({
     queryKey: ["users", { limit, offset }],
@@ -57,9 +57,9 @@ const UserManagementPage = () => {
   });
 
   const { data: userRoles, isLoading: userRolesLoading } = useQuery({
-    queryKey: ["userRoles", selectedUser?.id],
-    queryFn: () => getUserRoles(selectedUser!.id),
-    enabled: !!selectedUser,
+    queryKey: ["userRoles", statsUser?.id],
+    queryFn: () => getUserRoles(statsUser!.id),
+    enabled: !!statsUser,
   });
 
   const assignRolesMutation = useMutation({
@@ -67,29 +67,50 @@ const UserManagementPage = () => {
       assignRoles(userId, roleIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["userRoles", selectedUser?.id] });
-      setIsDialogOpen(false);
-      setSelectedUser(null);
+      queryClient.invalidateQueries({ queryKey: ["userDetail", statsUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ["userRoles", statsUser?.id] });
       setSelectedRoleIds([]);
     },
   });
+
+  // 获取用户统计信息
+  const { data: userStats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useQuery({
+    queryKey: ["userStats", statsUser?.id],
+    queryFn: () => getUserThreadStats(statsUser!.id),
+    enabled: false, // 手动触发
+  });
+
+  // 获取用户详细信息
+  const { data: userDetail, isLoading: detailLoading, isError: detailError, refetch: refetchDetail } = useQuery({
+    queryKey: ["userDetail", statsUser?.id],
+    queryFn: () => getUserDetail(statsUser!.id),
+    enabled: false, // 手动触发
+  });
+
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
 
   const items = usersData?.items ?? [];
   const total = usersData?.total ?? 0;
   const canPrev = offset > 0;
   const canNext = offset + limit < total;
 
-  const handleManageRoles = (user: UserListItem) => {
-    setSelectedUser(user);
-    setIsDialogOpen(true);
+  const handleShowStats = (user: UserListItem) => {
+    setStatsUser(user);
+    setIsStatsDialogOpen(true);
   };
 
-  const handleDialogOpenChange = (open: boolean) => {
+  const handleStatsDialogOpenChange = (open: boolean) => {
     if (!open) {
-      setSelectedUser(null);
-      setSelectedRoleIds([]);
+      setStatsUser(null);
     }
-    setIsDialogOpen(open);
+    setIsStatsDialogOpen(open);
   };
 
   const handleRoleToggle = (roleId: string) => {
@@ -101,9 +122,9 @@ const UserManagementPage = () => {
   };
 
   const handleSaveRoles = () => {
-    if (!selectedUser) return;
+    if (!statsUser) return;
     assignRolesMutation.mutate({
-      userId: selectedUser.id,
+      userId: statsUser.id,
       roleIds: selectedRoleIds,
     });
   };
@@ -113,6 +134,19 @@ const UserManagementPage = () => {
       setSelectedRoleIds(userRoles.roles.map((r) => r.id));
     }
   }, [userRoles]);
+
+  useEffect(() => {
+    if (isStatsDialogOpen && statsUser) {
+      refetchStats();
+      refetchDetail();
+    }
+  }, [isStatsDialogOpen, statsUser, refetchStats, refetchDetail]);
+
+  useEffect(() => {
+    if (!isStatsDialogOpen) {
+      setSelectedRoleIds([]);
+    }
+  }, [isStatsDialogOpen]);
 
   if (!canManageUsers) {
     return (
@@ -169,10 +203,9 @@ const UserManagementPage = () => {
                   <TableRow className="text-xs">
                     <TableHead>用户</TableHead>
                     <TableHead className="text-center">状态</TableHead>
-                    <TableHead>角色</TableHead>
                     <TableHead className="text-center">创建时间</TableHead>
                     <TableHead className="text-center">最后登录</TableHead>
-                    {canAssignRoles && (
+                    {(canAssignRoles || canViewThreads || canViewFiles) && (
                       <TableHead className="text-center">操作</TableHead>
                     )}
                   </TableRow>
@@ -181,7 +214,7 @@ const UserManagementPage = () => {
                   {items.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2">
                           <img
                             src={user.avatar || "/storage/llm-excel/__SYS__/default_avatar.png"}
                             alt={user.username}
@@ -201,22 +234,6 @@ const UserManagementPage = () => {
                           {user.status === 0 ? "正常" : "禁用"}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.roles.length > 0 ? (
-                            user.roles.map((role) => (
-                              <span
-                                key={role.id}
-                                className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
-                              >
-                                {role.name}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">无角色</span>
-                          )}
-                        </div>
-                      </TableCell>
                       <TableCell className="text-center text-xs text-muted-foreground">
                         {dayjs(user.created_at).format("YYYY-MM-DD")}
                       </TableCell>
@@ -225,16 +242,42 @@ const UserManagementPage = () => {
                           ? dayjs(user.last_login_at).format("YYYY-MM-DD HH:mm")
                           : "-"}
                       </TableCell>
-                      {canAssignRoles && (
+                      {(canAssignRoles || canViewThreads || canViewFiles) && (
                         <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleManageRoles(user)}
-                          >
-                            <Shield className="mr-1 h-3.5 w-3.5" />
-                            角色
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            {canViewThreads && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                              >
+                                <Link to={`/admin/users/${user.id}/threads`}>
+                                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                                  线程
+                                </Link>
+                              </Button>
+                            )}
+                            {canViewFiles && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                              >
+                                <Link to={`/admin/users/${user.id}/files`}>
+                                  <File className="mr-1 h-3.5 w-3.5" />
+                                  文件
+                                </Link>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleShowStats(user)}
+                            >
+                              <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                              用户信息
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -273,66 +316,99 @@ const UserManagementPage = () => {
         </div>
       </div>
 
-      {/* Role Assignment Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent>
+      {/* 用户信息对话框 */}
+      <Dialog open={isStatsDialogOpen} onOpenChange={handleStatsDialogOpenChange}>
+        <DialogContent className="w-auto min-w-[1200px] max-w-[95vw] max-h-[90vh] overflow-auto px-8">
           <DialogHeader>
-            <DialogTitle>管理用户角色</DialogTitle>
+            <DialogTitle>用户信息</DialogTitle>
             <DialogDescription>
-              为用户 <strong>{selectedUser?.username}</strong> 分配角色
+              用户 <strong>{statsUser?.username}</strong> 的详细信息
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {userRolesLoading && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-              </div>
-            )}
-
-            {!userRolesLoading && roles.map((role) => (
-              <div key={role.id} className="flex items-start space-x-3">
-                <Checkbox
-                  id={`role-${role.id}`}
-                  checked={selectedRoleIds.includes(role.id)}
-                  onCheckedChange={() => handleRoleToggle(role.id)}
+          <div className="flex flex-row gap-8 py-4">
+            {/* 左侧：用户信息卡片（含角色分配下拉） */}
+            <div className="w-[650px]">
+              {statsUser && (detailLoading || userDetail) && (
+                <UserInfoCard
+                  user={userDetail}
+                  isLoading={detailLoading}
+                  canAssignRoles={canAssignRoles}
+                  availableRoles={roles}
+                  selectedRoleIds={selectedRoleIds}
+                  onToggleRole={handleRoleToggle}
+                  onSaveRoles={handleSaveRoles}
+                  isSaving={assignRolesMutation.isPending}
                 />
-                <div className="flex-1">
-                  <Label htmlFor={`role-${role.id}`} className="cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{role.name}</span>
-                      {role.is_system && (
-                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
-                          系统
-                        </span>
-                      )}
-                    </div>
-                    {role.description && (
-                      <p className="text-sm text-slate-600">{role.description}</p>
-                    )}
-                    <p className="text-xs text-slate-400">
-                      {role.permission_count} 个权限
-                    </p>
-                  </Label>
+              )}
+            </div>
+
+            {/* 右侧：数据统计 */}
+            <div className="w-[450px] space-y-4">
+              {statsLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                 </div>
-              </div>
-            ))}
+              )}
+
+              {(statsError || detailError) && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
+                  获取用户信息失败，请稍后重试
+                </div>
+              )}
+
+              {!statsLoading && userStats && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">线程总数</div>
+                      <div className="text-lg font-semibold">{userStats.thread_count}</div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">活跃线程</div>
+                      <div className="text-lg font-semibold">{userStats.active_thread_count}</div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">总消息数</div>
+                      <div className="text-lg font-semibold">{userStats.total_turns}</div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">文件总数</div>
+                      <div className="text-lg font-semibold">{userStats.file_count}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-slate-50 p-3">
+                    <div className="text-xs text-slate-500">总文件大小</div>
+                    <div className="text-lg font-semibold">{formatFileSize(userStats.total_file_size)}</div>
+                  </div>
+
+                  {userStats.last_activity_at && (
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">最后活动时间</div>
+                      <div className="text-sm font-medium">
+                        {dayjs(userStats.last_activity_at).format("YYYY-MM-DD HH:mm")}
+                      </div>
+                    </div>
+                  )}
+
+                  {!userStats.last_activity_at && (
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">最后活动时间</div>
+                      <div className="text-sm font-medium text-slate-400">暂无活动</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!statsLoading && !userStats && !statsError && (
+                <div className="py-8 text-center text-sm text-slate-400">
+                  暂无统计信息
+                </div>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>
-              取消
-            </Button>
-            <Button
-              onClick={handleSaveRoles}
-              disabled={assignRolesMutation.isPending}
-            >
-              {assignRolesMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              保存
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

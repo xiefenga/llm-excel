@@ -3,7 +3,7 @@
  * 仅管理员可访问
  */
 
-import { Users, Bug, Brain, Route, FlaskConical, AlertCircle, ChevronRight, ArrowLeft } from "lucide-react";
+import { Users, Bug, Brain, Route, FlaskConical, AlertCircle, ChevronRight, ArrowLeft, MessageSquare } from "lucide-react";
 import { Link } from "react-router";
 
 import { Button } from "~/components/ui/button";
@@ -12,9 +12,10 @@ import { Permissions } from "~/lib/permissions";
 
 const AdminPage = () => {
   const isAdmin = useRole("admin");
-  const canViewUsers = usePermission(Permissions.USER_READ);
-  const canViewBTracks = usePermission(Permissions.BTRACK_READ);
-  const canManageSystem = usePermission(Permissions.SYSTEM_SETTINGS);
+  const canViewUsers = usePermission("user:read");
+  const canViewBTracks = usePermission("btrack:read");
+  const canManageSystem = usePermission("system:settings");
+  const canViewThreads = usePermission("thread:read:all");
 
   if (!isAdmin && !canViewUsers && !canViewBTracks && !canManageSystem) {
     return (
@@ -37,6 +38,13 @@ const AdminPage = () => {
       icon: Users,
       href: "/admin/users",
       permission: canViewUsers,
+    },
+    {
+      title: "线程管理",
+      description: "查看所有用户的聊天线程",
+      icon: MessageSquare,
+      href: "/admin/threads",
+      permission: canViewThreads,
     },
     {
       title: "异常追踪",

@@ -7,6 +7,7 @@ import { FileSpreadsheet, Loader2, Clock, History, MoreHorizontal, Pencil, Trash
 
 import { cn, formatRelativeTime } from "~/lib/utils";
 import { deleteThread, getThreads, renameThread } from '~/lib/api'
+import { useCurrentUser } from "~/hooks/use-current-user";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,10 +49,11 @@ const ThreadSidebar = ({ isOpen, onClose }: Props) => {
 
   const navigate = useNavigate();
   const params = useParams();
+  const { user } = useCurrentUser();
 
   const { data: threads, isLoading, refetch } = useQuery({
-    queryKey: ['threads'],
-    queryFn: () => getThreads()
+    queryKey: ['threads', user?.id],
+    queryFn: () => getThreads(user?.id)
   })
 
   const { mutateAsync: mutateThreadDelete } = useMutation({
