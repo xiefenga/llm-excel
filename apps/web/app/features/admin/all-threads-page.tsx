@@ -151,7 +151,7 @@ const AllThreadsPage = () => {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>线程管理</BreadcrumbPage>
+              <BreadcrumbPage>会话管理</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -170,7 +170,7 @@ const AllThreadsPage = () => {
                     <ArrowRight className="mr-1 h-4 w-4 rotate-180" />
                   </Link>
                 </Button>
-                <h2 className="text-sm font-semibold">聊天线程列表</h2>
+                <h2 className="text-sm font-semibold">会话列表</h2>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">

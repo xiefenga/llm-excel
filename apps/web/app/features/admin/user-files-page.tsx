@@ -169,7 +169,7 @@ const UserFilesPage = () => {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>上传文件</BreadcrumbPage>
+              <BreadcrumbPage>文件</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>

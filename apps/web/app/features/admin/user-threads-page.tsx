@@ -178,7 +178,7 @@ const UserThreadsPage = () => {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>聊天线程</BreadcrumbPage>
+              <BreadcrumbPage>会话和信息</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -198,7 +198,7 @@ const UserThreadsPage = () => {
                     
                   </Link>
                 </Button>
-                <h2 className="text-sm font-semibold">聊天线程列表</h2>
+                <h2 className="text-sm font-semibold">会话列表</h2>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">

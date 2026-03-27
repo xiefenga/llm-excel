@@ -88,10 +88,7 @@ const UserInfoCard = ({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium">用户信息</CardTitle>
-        <CardDescription>用户的完整信息，包括邮箱、状态和注册时间</CardDescription>
-      </CardHeader>
+      <CardHeader className="pb-0" />
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-12 w-12">
@@ -169,12 +166,12 @@ const UserInfoCard = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 text-sm">
             <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="min-w-0">
               <div className="text-xs text-muted-foreground">用户ID</div>
-              <div className="font-mono text-xs truncate" title={user.id}>{user.id}</div>
+              <div className="font-mono text-xs break-all">{user.id}</div>
             </div>
           </div>
 
@@ -183,12 +180,11 @@ const UserInfoCard = ({
               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <div className="text-xs text-muted-foreground">邮箱地址</div>
-                <div className="truncate" title={user.email}>{user.email}</div>
+                <div className="truncate">{user.email}</div>
               </div>
             </div>
           )}
 
-          {/* 注册时间 */}
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>
@@ -197,7 +193,6 @@ const UserInfoCard = ({
             </div>
           </div>
 
-          {/* 最后登录时间 */}
           <div className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>

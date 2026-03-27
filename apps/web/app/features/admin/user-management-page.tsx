@@ -253,7 +253,7 @@ const UserManagementPage = () => {
                               >
                                 <Link to={`/admin/users/${user.id}/threads`}>
                                   <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                                  线程
+                                  会话
                                 </Link>
                               </Button>
                             )}
@@ -318,12 +318,9 @@ const UserManagementPage = () => {
 
       {/* 用户信息对话框 */}
       <Dialog open={isStatsDialogOpen} onOpenChange={handleStatsDialogOpenChange}>
-        <DialogContent className="w-auto min-w-[750px] max-w-[95vw] max-h-[90vh] overflow-auto px-6">
+        <DialogContent className="w-auto min-w-[750px] max-w-[95vw] max-h-[90vh] overflow-hidden px-6">
           <DialogHeader>
             <DialogTitle>用户信息</DialogTitle>
-            <DialogDescription>
-              用户 <strong>{statsUser?.username}</strong> 的详细信息
-            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-row gap-6 py-4">

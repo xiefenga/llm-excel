@@ -40,8 +40,8 @@ const AdminPage = () => {
       permission: canViewUsers,
     },
     {
-      title: "线程管理",
-      description: "查看所有用户的聊天线程",
+      title: "会话管理",
+      description: "查看所有用户的会话记录",
       icon: MessageSquare,
       href: "/admin/threads",
       permission: canViewThreads,
