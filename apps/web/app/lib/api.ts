@@ -283,6 +283,13 @@ export interface ThreadListItem {
   turn_count: number;
 }
 
+export interface ThreadListResponse {
+  items: ThreadListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /** 步骤记录（与 STEPS_STORAGE_SPEC 对齐） */
 export interface ThreadTurnStep {
   step: string;
@@ -315,6 +322,81 @@ export interface ThreadDetail {
   created_at: string;
   updated_at: string;
   turns: ThreadTurn[];
+}
+
+// ============ 管理员查看用户数据相关类型 ============
+
+/** 用户线程列表项（包含用户信息） */
+export interface UserThreadItem {
+  id: string;
+  title: string | null;
+  status: 'active' | 'deleted';
+  health_status: 'normal' | 'error';
+  turn_count: number;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  };
+}
+
+/** 用户线程列表响应 */
+export interface UserThreadsResponse {
+  items: UserThreadItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** 用户文件列表项 */
+export interface UserFileItem {
+  id: string;
+  filename: string;
+  file_size: number;
+  mime_type: string | null;
+  uploaded_at: string;
+  download_url: string;
+  turn_count: number; // 被使用的聊天轮次数量
+}
+
+/** 用户文件列表响应 */
+export interface UserFilesResponse {
+  items: UserFileItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** 用户统计信息响应 */
+export interface UserStatsResponse {
+  thread_count: number;
+  active_thread_count: number;
+  total_turns: number;
+  file_count: number;
+  total_file_size: number;
+  last_activity_at: string | null;
+}
+
+/** 角色信息 */
+export interface RoleInfo {
+  id: string;
+  name: string;
+  code: string;
+}
+
+/** 用户详细信息 */
+export interface UserDetail {
+  id: string;
+  username: string;
+  avatar: string | null;
+  status: number;
+  email: string | null;
+  role_count: number;
+  roles: RoleInfo[];
+  created_at: string;
+  last_login_at: string | null;
 }
 
 // 获取 BTrack 列表
@@ -422,13 +504,14 @@ export async function getUserInfo(): Promise<UserInfo> {
 // ============ 线程管理 ============
 
 // 获取线程列表
-export async function getThreads(): Promise<ThreadListItem[]> {
+export async function getThreads(userId?: string): Promise<ThreadListItem[]> {
   try {
-    const res = await axios.get<ApiResponse<ThreadListItem[]>>(`${API_BASE}/threads`);
+    const params = userId ? { user_id: userId } : {};
+    const res = await axios.get<ApiResponse<ThreadListResponse>>(`${API_BASE}/threads`, { params });
     if (res.data.code !== 0) {
       throw new Error(res.data.msg || "获取失败");
     }
-    return res.data.data || [];
+    return res.data.data?.items || [];
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
@@ -492,6 +575,151 @@ export async function renameThread(threadId: string, title: string): Promise<voi
       throw new Error(errorMessage);
     }
     throw new Error("重命名失败");
+  }
+}
+
+// 获取用户线程列表（管理员）
+export async function getUserThreads(
+  userId: string,
+  limit?: number,
+  offset?: number,
+  healthStatus?: "normal" | "error"
+): Promise<UserThreadsResponse> {
+  try {
+    const res = await axios.get<ApiResponse<UserThreadsResponse>>(`${API_BASE}/threads`, {
+      params: { user_id: userId, limit, offset, health_status: healthStatus },
+    });
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取所有线程列表（管理员 - 支持用户过滤）
+export async function getAllThreads(
+  limit?: number,
+  offset?: number,
+  healthStatus?: "normal" | "error",
+  userId?: string
+): Promise<UserThreadsResponse> {
+  try {
+    const res = await axios.get<ApiResponse<UserThreadsResponse>>(`${API_BASE}/threads`, {
+      params: { limit, offset, health_status: healthStatus, user_id: userId },
+    });
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取用户文件列表（管理员）
+export async function getUserFiles(
+  userId: string,
+  limit?: number,
+  offset?: number
+): Promise<UserFilesResponse> {
+  try {
+    const res = await axios.get<ApiResponse<UserFilesResponse>>(`${API_BASE}/users/${userId}/files`, {
+      params: { limit, offset },
+    });
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取用户线程统计信息（管理员）
+export async function getUserThreadStats(userId: string): Promise<UserStatsResponse> {
+  try {
+    const res = await axios.get<ApiResponse<UserStatsResponse>>(`${API_BASE}/users/${userId}/threads/stats`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取用户详细信息（管理员）
+export async function getUserDetail(userId: string): Promise<UserDetail> {
+  try {
+    const res = await axios.get<ApiResponse<UserDetail>>(`${API_BASE}/users/${userId}`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("响应数据为空");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
+  }
+}
+
+// 获取线程详情（管理员）
+export async function getThreadDetailAdmin(threadId: string): Promise<ThreadDetail> {
+  // 拦截无效的 threadId
+  if (!threadId || threadId === "null" || threadId === "undefined") {
+    throw new Error("NO_THREAD_ID");
+  }
+
+  try {
+    const res = await axios.get<ApiResponse<ThreadDetail>>(`${API_BASE}/threads/admin/${threadId}`);
+    if (res.data.code !== 0) {
+      throw new Error(res.data.msg || "获取失败");
+    }
+    if (!res.data.data) {
+      throw new Error("线程不存在");
+    }
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.msg || error.response?.data?.detail || error.message || "获取失败";
+      throw new Error(errorMessage);
+    }
+    throw new Error("获取失败");
   }
 }
 

@@ -249,7 +249,7 @@ async def stream_processing_pipeline(
                  await repo.commit()
             else:
                  tracker.error(ctx.step, "STEP_ERROR", ctx.error)
-                 await repo.mark_failed(turn_id, tracker)
+                 await repo.mark_failed(turn_id, actual_thread_id, tracker)
                  await repo.commit()
 
     async def load_tables():
