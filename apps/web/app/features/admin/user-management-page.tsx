@@ -318,7 +318,7 @@ const UserManagementPage = () => {
 
       {/* 用户信息对话框 */}
       <Dialog open={isStatsDialogOpen} onOpenChange={handleStatsDialogOpenChange}>
-        <DialogContent className="w-auto min-w-[1200px] max-w-[95vw] max-h-[90vh] overflow-auto px-8">
+        <DialogContent className="w-auto min-w-[750px] max-w-[95vw] max-h-[90vh] overflow-auto px-6">
           <DialogHeader>
             <DialogTitle>用户信息</DialogTitle>
             <DialogDescription>
@@ -326,9 +326,9 @@ const UserManagementPage = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-row gap-8 py-4">
+          <div className="flex flex-row gap-6 py-4">
             {/* 左侧：用户信息卡片（含角色分配下拉） */}
-            <div className="w-[650px]">
+            <div className="w-[400px]">
               {statsUser && (detailLoading || userDetail) && (
                 <UserInfoCard
                   user={userDetail}
@@ -344,7 +344,7 @@ const UserManagementPage = () => {
             </div>
 
             {/* 右侧：数据统计 */}
-            <div className="w-[450px] space-y-4">
+            <div className="w-[280px] space-y-4">
               {statsLoading && (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
