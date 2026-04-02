@@ -111,9 +111,10 @@ selgetabel/
 │   │   ├── app/
 │   │   │   ├── main.py        # App entry point
 │   │   │   ├── api/routes/    # Route handlers
-│   │   │   ├── engine/        # Core: parser, executor, formula gen, LLM prompts
-│   │   │   ├── processor/     # Processing pipeline
-│   │   │   ├── services/      # Business logic, file I/O, auth
+│   │   │   ├── engine/        # Core: parser, executor, formula gen, intent classifier
+│   │   │   ├── processor/     # Processing pipeline stages
+│   │   │   ├── services/      # Business logic: chat, intent, context, file I/O, auth
+│   │   │   ├── persistence/   # Data access layer
 │   │   │   ├── models/        # SQLAlchemy ORM
 │   │   │   └── core/          # Config, DB, JWT
 │   │   └── pyproject.toml
@@ -135,6 +136,17 @@ selgetabel/
 └── turbo.json
 ```
 
+**Key engine components:**
+- `intent_classifier.py` — LLM-based intent classification (CHAT/ANALYSIS/PROCESSING/UNCLEAR)
+- `context_builder.py` — Formats context for LLM prompts based on intent type
+- `excel_generator.py` — Converts JSON expressions to Excel formulas
+- `llm_client.py` — Unified LLM API interface with multi-provider support
+
+**Key services:**
+- `intent_service.py` — Orchestrates intent recognition and routing decisions
+- `context_service.py` — Manages multi-turn conversation context
+- `chat_stream.py` — Streams chat responses for non-processing intents
+
 ### LLM Providers
 
 The system supports multiple LLM providers with database-driven configuration. Providers, models, and credentials are managed via the admin API (`/llm/*`).
@@ -151,20 +163,53 @@ The system supports multiple LLM providers with database-driven configuration. P
 | Qwen | `qwen` | Planned |
 | Ollama | `ollama` | Planned |
 
-**Stage-level routing** — different pipeline stages (analyze, generate, title) can use different provider/model combinations.
+**Stage-level routing** — different pipeline stages (intent, generate, title) can use different provider/model combinations.
 
 See [LLM Provider Design](docs/design/LLM_PROVIDER_DESIGN.md) for the full architecture.
+
+### Intent Classification
+
+The system uses LLM-based intent classification to understand user queries and route them appropriately:
+
+| Intent | Description |
+|--------|-------------|
+| `chat` | Pure conversation without file processing (greetings, questions about features, etc.) |
+| `analysis` | Data analysis/summary without modifying data |
+| `processing` | Data processing that modifies/transforms/exports data |
+| `unclear` | Ambiguous requirements or missing parameters, requires clarification |
+
+**Classification rules:**
+- If no files are uploaded, intent cannot be `analysis` or `processing` — must be `chat`
+- If user provides vague instructions (e.g., "group by" without specifying which column), system returns `unclear` with a clarification question
+- If user provides a short response like "yes", "correct", or a column name, system inherits the intent from the previous conversation turn
+
+**Clarification flow:** When intent is `unclear` or requires clarification, the system asks a gentle follow-up question before proceeding.
+
+### Multi-turn Conversation
+
+The system maintains conversation context through a **Thread/Turn** model:
+
+- **Thread**: A conversation session containing multiple turns
+- **Turn**: A single exchange (user query → system response)
+- **Context snapshots**: Each turn can save its context state for future reference
+- **File inheritance**: When user doesn't upload files in a new turn, the system automatically inherits files from previous turns
+
+**Context types** are built based on intent:
+- `chat`: Conversation history, topic continuity analysis
+- `analysis`: Historical analysis records, data insights, file analysis history
+- `processing`: Operation history, data state, available files, file dependencies
 
 ### Processing Pipeline
 
 The backend streams SSE events through a multi-stage pipeline:
 
 ```
-Upload → Load → Generate (LLM) → Validate → Execute → Export
+Intent Recognition → Generate + Validate (LLM, with retry) → Execute → Export
 ```
 
+- **Intent Recognition**: LLM classifies user intent (chat/analysis/processing/unclear)
 - **Generate**: LLM produces structured JSON operations from natural language
-- **Validate**: Parser checks format and applies function whitelist
+- **Validate**: Parser checks format and applies function whitelist (with automatic retry on failure)
 - **Execute**: Engine runs operations and generates Excel formulas
 - **Export**: Outputs downloadable `.xlsx` with embedded formulas
 
