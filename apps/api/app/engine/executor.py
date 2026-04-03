@@ -1293,7 +1293,19 @@ class Executor:
                     # 尝试按别名排序：查找值聚合的别名
                     for v in op.values:
                         if v.as_name == sort_col:
-                            pivot_df = pivot_df.sort_values(by=v.column, key=lambda x: x.sum(), ascending=ascending)
+                            if op.col_fields:
+                                # 交叉表模式下，按别名排序对所有相关列求和
+                                # 列名格式为 "列值_as_name"，找到所有以 __{as_name} 结尾的列
+                                prefix = f"_{v.as_name}"
+                                related_cols = [c for c in pivot_df.columns if c.endswith(prefix)]
+                                if related_cols:
+                                    # 按行求和得到排序键，用辅助列实现排序
+                                    pivot_df = pivot_df.assign(_sort_key=pivot_df[related_cols].sum(axis=1))
+                                    pivot_df = pivot_df.sort_values(by="_sort_key", ascending=ascending)
+                                    pivot_df = pivot_df.drop(columns=["_sort_key"])
+                            else:
+                                # 非交叉表模式，直接按列排序
+                                pivot_df = pivot_df.sort_values(by=v.column, key=lambda x: x.sum(), ascending=ascending)
                             break
                 else:
                     pivot_df = pivot_df.sort_values(sort_col, ascending=ascending)
