@@ -131,7 +131,7 @@
 #### 设计原则
 
 - **Excel 版本适配**：
-  - 高级操作（filter, sort, group_by, take）：同时提供非 365 和 365 两种方式
+  - 高级操作（filter, sort, group_by, take, pivot）：同时提供非 365 和 365 两种方式
   - 基础操作（add_column, aggregate 等）：公式方式，版本通用
 
 - **优先级**：非 365 方式优先展示（大部分用户使用非 365 版本）
@@ -150,6 +150,7 @@
 | `sort`          | 高级 | 排序功能     | SORT 函数          |
 | `group_by`      | 高级 | 数据透视表   | GROUPBY 函数       |
 | `take`          | 高级 | 手动删除行   | TAKE 函数          |
+| `pivot`         | 高级 | 数据透视表   | PIVOTBY 函数       |
 | `create_sheet`  | 内部 | 新建工作表   | 新建工作表（相同） |
 
 #### 输出格式
@@ -295,7 +296,7 @@ OPERATION_TYPE_NAMES = {
 }
 
 # 高级操作（需要区分 365 / 非 365）
-ADVANCED_OPERATIONS = {"filter", "sort", "group_by", "take"}
+ADVANCED_OPERATIONS = {"filter", "sort", "group_by", "take", "pivot"}
 ```
 
 ### 集成位置

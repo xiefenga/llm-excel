@@ -21,6 +21,7 @@ from app.engine.models import (
     OperationResult,
     ExcelError,
 )
+from app.engine.pivot_models import PivotOperation
 from app.engine.functions import (
     AGGREGATE_FUNC_MAP,
     ROW_FUNC_MAP,
@@ -460,8 +461,8 @@ class Executor:
                         # 立即将更新后的列应用到表中，以便后续操作可以引用
                         self._apply_updated_column(op.file_id, op.table, op.column, op_result.value)
 
-                # 处理新创建的 Sheet（filter, sort, group_by, create_sheet, take, select/drop）
-                if isinstance(op, (FilterOperation, SortOperation, GroupByOperation, CreateSheetOperation, TakeOperation, SelectColumnsOperation, DropColumnsOperation)):
+                # 处理新创建的 Sheet（filter, sort, group_by, create_sheet, take, select/drop, pivot）
+                if isinstance(op, (FilterOperation, SortOperation, GroupByOperation, CreateSheetOperation, TakeOperation, SelectColumnsOperation, DropColumnsOperation, PivotOperation)):
                     if has_value and isinstance(op_result.value, dict):
                         sheet_data = op_result.value
                         if "sheet_name" in sheet_data and "data" in sheet_data:
@@ -535,6 +536,8 @@ class Executor:
             return self._execute_select_columns(op)
         elif isinstance(op, DropColumnsOperation):
             return self._execute_drop_columns(op)
+        elif isinstance(op, PivotOperation):
+            return self._execute_pivot(op)
         else:
             return OperationResult(
                 operation=op,
@@ -757,7 +760,7 @@ class Executor:
                 col = cond["column"]
                 operator = cond["op"]
                 raw_value = cond["value"]
-                
+
                 if isinstance(raw_value, dict):
                     evaluator = FormulaEvaluator(
                         tables=self.tables,
@@ -1207,6 +1210,175 @@ class Executor:
 
         except Exception as e:
             return OperationResult(operation=op, error=str(e))
+
+    def _execute_pivot(self, op: PivotOperation) -> OperationResult:
+        """
+        执行数据透视操作
+
+        使用 pandas pivot_table 实现，对应 Excel 365 的 PIVOTBY 函数
+        """
+        # pandas 聚合函数名映射
+        PIVOT_AGG_MAP = {
+            "SUM": "sum",
+            "COUNT": "count",
+            "AVERAGE": "mean",
+            "MIN": "min",
+            "MAX": "max",
+        }
+
+        try:
+            # 1. 获取源数据表
+            table = self.tables.get_table(op.file_id, op.table)
+            df = table.get_data()
+
+            # 2. 预处理筛选
+            if op.filter:
+                df = self._apply_pivot_filter(df, op.filter)
+
+            # 转换聚合函数名
+            def get_agg_func(func_str: str) -> str:
+                return PIVOT_AGG_MAP.get(func_str.upper(), func_str.lower())
+
+            # 3. 执行透视
+            if op.col_fields:
+                # 交叉表模式：有列字段，进行二维透视
+                pivot_df = pd.pivot_table(
+                    df,
+                    index=op.row_fields,
+                    columns=op.col_fields,
+                    values=[v.column for v in op.values],
+                    aggfunc={v.column: get_agg_func(v.function) for v in op.values},
+                    fill_value=None,
+                    sort=False
+                )
+
+                # 处理 MultiIndex 列名：(value_col, col_field_value) -> "col_field_value_as_name"
+                new_columns = []
+                for col in pivot_df.columns:
+                    if isinstance(col, tuple) and len(col) >= 2:
+                        value_col_name = col[0]
+                        col_field_value = str(col[1])
+                        # 找到对应的聚合别名
+                        for v in op.values:
+                            if v.column == value_col_name:
+                                new_columns.append(f"{col_field_value}_{v.as_name}")
+                                break
+                        else:
+                            new_columns.append(col_field_value)
+                    else:
+                        new_columns.append(str(col))
+                pivot_df.columns = new_columns
+
+                # 重置索引，将 row_fields 转为普通列
+                pivot_df = pivot_df.reset_index()
+
+                # 确保 row_fields 列在前面
+                row_fields_list = op.row_fields if isinstance(op.row_fields, list) else [op.row_fields]
+                value_cols = [c for c in pivot_df.columns if c not in row_fields_list]
+                pivot_df = pivot_df[row_fields_list + value_cols]
+            else:
+                # 简单分组模式：只有行字段，没有列字段
+                agg_dict = {v.column: get_agg_func(v.function) for v in op.values}
+                pivot_df = df.groupby(op.row_fields, as_index=False).agg(agg_dict)
+                # 重命名列
+                row_fields_list = op.row_fields if isinstance(op.row_fields, list) else [op.row_fields]
+                pivot_df.columns = row_fields_list + [v.as_name for v in op.values]
+
+            # 4. 排序
+            if op.sort:
+                sort_col = op.sort.by
+                ascending = op.sort.order == "asc"
+
+                if sort_col not in pivot_df.columns:
+                    # 尝试按别名排序：查找值聚合的别名
+                    for v in op.values:
+                        if v.as_name == sort_col:
+                            if op.col_fields:
+                                # 交叉表模式下，按别名排序对所有相关列求和
+                                # 列名格式为 "列值_as_name"，找到所有以 __{as_name} 结尾的列
+                                prefix = f"_{v.as_name}"
+                                related_cols = [c for c in pivot_df.columns if c.endswith(prefix)]
+                                if related_cols:
+                                    # 按行求和得到排序键，用辅助列实现排序
+                                    pivot_df = pivot_df.assign(_sort_key=pivot_df[related_cols].sum(axis=1))
+                                    pivot_df = pivot_df.sort_values(by="_sort_key", ascending=ascending)
+                                    pivot_df = pivot_df.drop(columns=["_sort_key"])
+                            else:
+                                # 非交叉表模式，直接按列排序
+                                pivot_df = pivot_df.sort_values(by=v.column, key=lambda x: x.sum(), ascending=ascending)
+                            break
+                else:
+                    pivot_df = pivot_df.sort_values(sort_col, ascending=ascending)
+
+            # 5. 返回结果
+            return OperationResult(
+                operation=op,
+                value={
+                    "file_id": op.file_id,
+                    "sheet_name": op.output["name"],
+                    "data": pivot_df,
+                    "row_count": len(pivot_df)
+                }
+            )
+
+        except Exception as e:
+            return OperationResult(operation=op, error=str(e))
+
+    def _apply_pivot_filter(self, df: pd.DataFrame, filters) -> pd.DataFrame:
+        """
+        应用筛选条件到 DataFrame
+
+        Args:
+            df: 源数据
+            filters: PivotFilter 列表
+
+        Returns:
+            筛选后的 DataFrame
+        """
+        for f in filters:
+            col = f.column
+            operator = f.op
+            value = f.value
+
+            if col not in df.columns:
+                raise ValueError(f"列 '{col}' 不存在于表中")
+
+            col_data = df[col]
+
+            if operator in {">", "<", ">=", "<="}:
+                if isinstance(value, (int, float)):
+                    col_numeric = pd.to_numeric(col_data, errors="coerce")
+                    if operator == ">":
+                        df = df[col_numeric > value]
+                    elif operator == "<":
+                        df = df[col_numeric < value]
+                    elif operator == ">=":
+                        df = df[col_numeric >= value]
+                    elif operator == "<=":
+                        df = df[col_numeric <= value]
+                else:
+                    col_str = col_data.astype(str)
+                    value_str = str(value)
+                    if operator == ">":
+                        df = df[col_str > value_str]
+                    elif operator == "<":
+                        df = df[col_str < value_str]
+                    elif operator == ">=":
+                        df = df[col_str >= value_str]
+                    elif operator == "<=":
+                        df = df[col_str <= value_str]
+            elif operator == "=":
+                if isinstance(value, (int, float)):
+                    col_numeric = pd.to_numeric(col_data, errors="coerce")
+                    df = df[(col_data == value) | (col_numeric == value)]
+                else:
+                    df = df[col_data == value]
+            elif operator == "<>":
+                df = df[col_data != value]
+            elif operator == "contains":
+                df = df[col_data.astype(str).str.contains(str(value), na=False)]
+
+        return df
 
 
 def execute_operations(operations: List[Operation], tables: FileCollection) -> ExecutionResult:

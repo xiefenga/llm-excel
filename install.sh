@@ -42,9 +42,9 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --version TAG   Specify image version (default: latest)"
-    echo "  --port PORT     Specify web service port (default: 8080)"
-    echo "  -h, --help      Show this help message"
+    echo "  --version TAG    Specify image version (default: latest)"
+    echo "  --port PORT      Specify web service port (default: 8080)"
+    echo "  -h, --help       Show this help message"
     echo ""
     echo "Examples:"
     echo "  curl -fsSL https://raw.githubusercontent.com/xiefenga/selgetabel/main/install.sh | bash"
@@ -135,11 +135,10 @@ set_env_var() {
 }
 
 # Wait for a service to become healthy
-# [MODIFIED]: Increased timeout from 60s to 180s (90 attempts * 2s) to handle slow Windows disk I/O
 wait_for_service() {
     local service_name="$1"
     local check_cmd="$2"
-    local max_attempts=90  # Changed from 30 to 90 (3 minutes total)
+    local max_attempts=90
     local interval=2
     local attempt=1
 
@@ -180,11 +179,17 @@ initialize() {
     local minio_bucket
     minio_bucket=$(load_env_var "MINIO_BUCKET" "llm-excel")
 
+    print_info "Setting up volume directory permissions for cross-platform compatibility..."
+    mkdir -p ./minio_data ./postgres_data 2>/dev/null || true
+    
+    chmod -R 777 ./minio_data 2>/dev/null || true
+    chmod -R 777 ./postgres_data 2>/dev/null || true
+
     # Step 1: Start infrastructure services only
     print_info "Starting PostgreSQL and MinIO..."
     docker compose up -d postgres minio
 
-    # [MODIFIED]: Add a small buffer to allow containers to actually start processes before checking
+    # Allow containers to initialize processes...
     print_info "Allowing containers to initialize processes..."
     sleep 5
 
@@ -198,8 +203,6 @@ initialize() {
 
     # Step 4: Run database migrations
     print_info "Running database migrations..."
-    # [MODIFIED]: Added error handling for migration in case it fails partially
-    # Added -T flag to disable TTY allocation for non-interactive script execution (e.g., curl | bash)
     if ! docker compose run -T --rm api uv run alembic upgrade head; then
         print_error "Database migrations failed. Check logs above."
         exit 1
@@ -234,7 +237,7 @@ initialize() {
     if [ -d "./minio/init_data" ] && [ "$(ls -A ./minio/init_data 2>/dev/null)" ]; then
         print_info "Uploading MinIO init data..."
         
-        # 获取当前脚本执行目录的绝对路径 (解决 Windows Git Bash 路径问题)
+        # 获取当前脚本执行目录的绝对路径
         CURRENT_DIR_ABS=$(cd "./minio/init_data" && pwd)
         
         for file_path in "${CURRENT_DIR_ABS}"/*; do

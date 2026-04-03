@@ -81,7 +81,7 @@ llm-excel/
 - `add_column` - Add calculated column with formula
 - `update_column` - Update existing column (e.g., fill nulls)
 - `compute` - Scalar computation on variables
-- `filter`, `sort`, `group_by`, `take`, `select_columns`, `drop_columns` - Excel 365+ dynamic array operations
+- `filter`, `sort`, `group_by`, `take`, `select_columns`, `drop_columns`, `pivot` - Excel 365+ dynamic array operations
 - `create_sheet` - Create new worksheet (internal abstraction)
 
 **Formula Expression Format:**

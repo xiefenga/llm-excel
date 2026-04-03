@@ -4,6 +4,9 @@ from typing import Union, List, Dict, Any, Optional
 from dataclasses import dataclass, field
 import pandas as pd
 
+# 延迟导入避免循环依赖
+from app.engine.pivot_models import PivotOperation
+
 
 # ==================== 辅助函数 ====================
 
@@ -310,7 +313,8 @@ Operation = Union[
     CreateSheetOperation,
     TakeOperation,
     SelectColumnsOperation,
-    DropColumnsOperation
+    DropColumnsOperation,
+    PivotOperation
 ]
 
 
@@ -835,8 +839,16 @@ class FileCollection:
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             for sheet_name in excel_file.get_sheet_names():
                 table = excel_file.get_sheet(sheet_name)
+                df = table.get_data()
+
+                # 处理 MultiIndex 列（pivot 操作会产生 MultiIndex）
+                if isinstance(df.columns, pd.MultiIndex):
+                    # 将 MultiIndex 列展平为字符串元组
+                    df = df.copy()
+                    df.columns = ['_'.join(str(c) for c in col) for col in df.columns]
+
                 # 直接使用 sheet 名称（不加文件名前缀）
-                table.get_data().to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
 
         return output.getvalue()
 

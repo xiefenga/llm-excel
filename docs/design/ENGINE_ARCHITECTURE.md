@@ -601,7 +601,7 @@ def generate_manual_steps(operations: List, tables: FileCollection) -> str
 **设计要点**：
 
 - **分工合作**：LLM 的 `description` 说明"做什么"，系统解析技术细节说明"怎么做"
-- **版本适配**：高级操作（filter, sort, group_by, take）提供两种复现方式
+- **版本适配**：高级操作（filter, sort, group_by, take, pivot）提供两种复现方式
   - 非 365：菜单操作步骤（优先展示）
   - 365：公式方式
 
