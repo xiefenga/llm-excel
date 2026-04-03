@@ -15,6 +15,7 @@ from app.engine.models import (
     SelectColumnsOperation,
     DropColumnsOperation,
 )
+from app.engine.pivot_models import PivotOperation
 from app.engine.excel_generator import ExcelFormulaGenerator
 
 
@@ -33,6 +34,7 @@ OPERATION_TYPE_NAMES = {
     "create_sheet": "创建工作表",
     "select_columns": "选择列",
     "drop_columns": "删除列",
+    "pivot": "数据透视",
 }
 
 # 高级操作（需要区分 365 / 非 365）
@@ -209,6 +211,8 @@ def _get_operation_type(op) -> str:
         return "drop_columns"
     if isinstance(op, CreateSheetOperation):
         return "create_sheet"
+    if isinstance(op, PivotOperation):
+        return "pivot"
     return "unknown"
 
 
@@ -285,6 +289,21 @@ def _get_operation_details(op) -> List[str]:
         if op.condition_column and op.condition is not None:
             details.append(f"条件：{op.condition_column} = {op.condition}")
 
+    elif isinstance(op, PivotOperation):
+        # 数据透视详细信息
+        details.append(f"行字段：{', '.join(op.row_fields)}")
+        if op.col_fields:
+            details.append(f"列字段：{', '.join(op.col_fields)}")
+        # 聚合信息
+        agg_parts = []
+        for v in op.values:
+            func_name = AGGREGATE_FUNCTION_NAMES.get(v.function, v.function)
+            agg_parts.append(f"{v.column} 的{func_name}")
+        details.append(f"聚合：{', '.join(agg_parts)}")
+        if op.sort:
+            order_cn = "降序" if op.sort.order == "desc" else "升序"
+            details.append(f"排序：按「{op.sort.by}」{order_cn}")
+
     return details
 
 
@@ -334,6 +353,11 @@ def _get_method_info(op) -> str:
         if source_type == "copy":
             return "复制工作表"
         return "新建工作表"
+
+    if isinstance(op, PivotOperation):
+        if op.col_fields:
+            return "PIVOTBY 函数"
+        return "GROUPBY 函数"
 
     return "Excel 操作"
 
@@ -527,6 +551,15 @@ def _generate_manual_step(
     elif isinstance(op, CreateSheetOperation):
         step_lines = _generate_create_sheet_manual_steps(op, tables)
         lines.extend(step_lines)
+
+    elif isinstance(op, PivotOperation):
+        step_lines, formula = _generate_pivot_manual_steps(op, tables)
+        lines.extend(step_lines)
+        formula_info = {
+            "step": step_num,
+            "description": description,
+            "formula": formula
+        }
 
     elif isinstance(op, ComputeOperation):
         step_lines = _generate_compute_manual_steps(op, tables, formula_generator)
@@ -1035,3 +1068,74 @@ def _describe_compute_formula(formula: Dict) -> str:
         return f"{formula['func']}({', '.join(args)})"
 
     return "..."
+
+
+def _generate_pivot_manual_steps(op: PivotOperation, tables: FileCollection) -> tuple:
+    """生成 pivot 操作的手动步骤"""
+    try:
+        excel_file = tables.get_file(op.file_id)
+        filename = excel_file.filename
+    except Exception:
+        filename = "Excel 文件"
+
+    output_name = op.output.get("name", "数据透视")
+    row_fields = "、".join([f"「{c}」" for c in op.row_fields])
+    col_fields = "、".join([f"「{c}」" for c in op.col_fields]) if op.col_fields else None
+
+    # 聚合描述
+    agg_desc = []
+    for v in op.values:
+        func_name = AGGREGATE_FUNCTION_NAMES.get(v.function, v.function)
+        agg_desc.append(f"「{v.column}」的{func_name}")
+
+    lines = [
+        f"   1. 打开 {filename}，切换到「{op.table}」工作表",
+        f"   2. 选中所有数据（包含表头）",
+        f"   3. 点击「插入」→「数据透视表」→「来自数据模型/源数据」",
+        f"   4. 选择「新工作表」，点击「确定」",
+        f"   5. 在右侧「数据透视表字段」面板中：",
+        f"      - 将 {row_fields} 拖到「行」区域",
+    ]
+
+    if col_fields:
+        lines.append(f"      - 将 {col_fields} 拖到「列」区域")
+
+    for agg in agg_desc:
+        lines.append(f"      - 将 {agg} 拖到「值」区域")
+
+    lines.extend([
+        f"   6. 将工作表重命名为「{output_name}」",
+    ])
+
+    # 生成 Excel 365 公式
+    formula = _generate_pivot_365_formula(op, tables)
+
+    return lines, formula
+
+
+def _generate_pivot_365_formula(op: PivotOperation, tables: FileCollection) -> str:
+    """生成 pivot 的 Excel 365 公式"""
+    table_name = op.table
+
+    # row_fields
+    row_refs = [f"{table_name}![{col}]" for col in op.row_fields]
+    row_part = f"HSTACK({', '.join(row_refs)})" if len(row_refs) > 1 else row_refs[0]
+
+    # col_fields
+    if op.col_fields:
+        col_refs = [f"{table_name}![{col}]" for col in op.col_fields]
+        col_part = f"HSTACK({', '.join(col_refs)})" if len(col_refs) > 1 else col_refs[0]
+    else:
+        col_part = ""
+
+    # values + functions
+    value_funcs = [f"{v.function.upper()}({table_name}![{v.column}])" for v in op.values]
+    val_part = f"HSTACK({', '.join(value_funcs)})"
+
+    # 排序参数
+    sort_order = "2" if op.sort and op.sort.order == "desc" else "1"
+
+    if op.col_fields:
+        return f"=PIVOTBY({row_part}, {col_part}, {val_part}, , , {sort_order})"
+    else:
+        return f"=GROUPBY({row_part}, {val_part}, {op.values[0].function.upper()})"

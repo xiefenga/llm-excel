@@ -16,6 +16,7 @@ from app.engine.models import (
     DropColumnsOperation,
     Operation,
 )
+from app.engine.pivot_models import PivotOperation
 
 
 # ==================== 白名单定义 ====================
@@ -56,7 +57,7 @@ SCALAR_FUNCTIONS = {
 VALID_TYPES = {
     "aggregate", "add_column", "update_column", "compute",
     "filter", "sort", "group_by", "create_sheet", "take",
-    "select_columns", "drop_columns"
+    "select_columns", "drop_columns", "pivot"
 }
 
 # 筛选条件运算符
@@ -215,6 +216,8 @@ class OperationParser:
             return OperationParser._parse_select_columns(op_data, prefix)
         elif op_type == "drop_columns":
             return OperationParser._parse_drop_columns(op_data, prefix)
+        elif op_type == "pivot":
+            return OperationParser._parse_pivot(op_data, prefix)
 
         return None, [f"{prefix}: 未知操作类型 '{op_type}'"]
 
@@ -758,6 +761,103 @@ class OperationParser:
         return op, []
 
     @staticmethod
+    def _parse_pivot(
+        op_data: Dict[str, Any], prefix: str
+    ) -> Tuple[Optional[PivotOperation], List[str]]:
+        """解析 pivot 操作"""
+        errors = []
+
+        # 必需字段
+        required = ["file_id", "table", "row_fields", "values", "output"]
+        for field in required:
+            if field not in op_data:
+                errors.append(f"{prefix}: 缺少必需字段 '{field}'")
+
+        if errors:
+            return None, errors
+
+        # 验证 row_fields
+        row_fields = op_data["row_fields"]
+        if not isinstance(row_fields, list) or len(row_fields) == 0:
+            errors.append(f"{prefix}: row_fields 必须是非空数组")
+
+        # 验证 col_fields（可选）
+        col_fields = op_data.get("col_fields")
+        if col_fields is not None:
+            if not isinstance(col_fields, list):
+                errors.append(f"{prefix}: col_fields 必须是数组")
+
+        # 验证 values
+        values = op_data["values"]
+        if not isinstance(values, list) or len(values) == 0:
+            errors.append(f"{prefix}: values 必须是非空数组")
+        else:
+            for i, val in enumerate(values):
+                if not isinstance(val, dict):
+                    errors.append(f"{prefix}: values[{i}] 必须是对象")
+                    continue
+                if "column" not in val:
+                    errors.append(f"{prefix}: values[{i}] 缺少 'column' 字段")
+                if "function" not in val:
+                    errors.append(f"{prefix}: values[{i}] 缺少 'function' 字段")
+                elif val["function"].upper() not in GROUPBY_FUNCTIONS:
+                    errors.append(f"{prefix}: values[{i}] 的函数 '{val['function']}' 不支持")
+                if "as" not in val:
+                    errors.append(f"{prefix}: values[{i}] 缺少 'as' 字段")
+
+        # 验证 sort（可选）
+        sort = op_data.get("sort")
+        if sort is not None:
+            if not isinstance(sort, dict):
+                errors.append(f"{prefix}: sort 必须是对象")
+            elif "by" not in sort:
+                errors.append(f"{prefix}: sort 缺少 'by' 字段")
+            elif "order" in sort and sort["order"] not in {"asc", "desc"}:
+                errors.append(f"{prefix}: sort.order 必须是 'asc' 或 'desc'")
+
+        # 验证 filter（可选）
+        filter_list = op_data.get("filter")
+        if filter_list is not None:
+            if not isinstance(filter_list, list):
+                errors.append(f"{prefix}: filter 必须是数组")
+            else:
+                for i, f in enumerate(filter_list):
+                    if not isinstance(f, dict):
+                        errors.append(f"{prefix}: filter[{i}] 必须是对象")
+                        continue
+                    if "column" not in f:
+                        errors.append(f"{prefix}: filter[{i}] 缺少 'column' 字段")
+                    if "op" not in f:
+                        errors.append(f"{prefix}: filter[{i}] 缺少 'op' 字段")
+                    elif f["op"] not in FILTER_OPERATORS:
+                        errors.append(f"{prefix}: filter[{i}] 的 op '{f['op']}' 不支持")
+                    if "value" not in f:
+                        errors.append(f"{prefix}: filter[{i}] 缺少 'value' 字段")
+
+        # 验证 output
+        output = op_data["output"]
+        if not isinstance(output, dict):
+            errors.append(f"{prefix}: output 必须是对象")
+        elif "type" not in output:
+            errors.append(f"{prefix}: output 缺少 'type' 字段")
+        elif output["type"] != "new_sheet":
+            errors.append(f"{prefix}: pivot 的 output.type 必须是 'new_sheet'")
+        elif "name" not in output:
+            errors.append(f"{prefix}: output 缺少 'name' 字段")
+
+        if errors:
+            return None, errors
+
+        # 创建操作对象
+        try:
+            op = PivotOperation.from_dict(op_data)
+            return op, []
+        except ValueError as e:
+            return None, [f"{prefix}: 创建操作失败 - {str(e)}"]
+        except Exception as e:
+            return None, [f"{prefix}: 创建操作失败 - {str(e)}"]
+
+    @staticmethod
     def validate_operations(
         operations: List[Operation],
         file_sheets: Dict[str, List[str]]
@@ -856,6 +956,12 @@ class OperationParser:
                     register_new_sheet(op.file_id, op.output["name"])
             elif isinstance(op, DropColumnsOperation):
                 check_file_and_sheet(op.file_id, op.table, prefix)
+                if op.output and op.output.get("type") == "new_sheet":
+                    register_new_sheet(op.file_id, op.output["name"])
+
+            elif isinstance(op, PivotOperation):
+                check_file_and_sheet(op.file_id, op.table, prefix)
+                # pivot 总是输出到新 sheet
                 if op.output and op.output.get("type") == "new_sheet":
                     register_new_sheet(op.file_id, op.output["name"])
 

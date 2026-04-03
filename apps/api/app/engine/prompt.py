@@ -278,6 +278,60 @@ GENERATION_PROMPT = """你是一个数据处理助手。
 }
 ```
 
+### 12. pivot - 数据透视（Excel 365+）
+
+**何时使用 pivot vs group_by**：
+
+| 场景 | 操作 |
+|------|------|
+| 简单分组求和/计数（一维） | `group_by` |
+| 需要行列交叉分析（二维） | `pivot` |
+| 同一维度需要多个聚合指标 | `pivot` |
+| 生成真正的二维透视表 | `pivot` |
+
+**何时用 pivot**：当用户需要
+- 按行列交叉分析（行一个维度、列一个维度）
+- 同时展示多个聚合指标（求和+计数+平均值）
+- 生成真正的二维透视表
+
+**何时用 group_by**：当用户只要求简单的分组聚合（一维），如"按地区统计销售额"
+
+```json
+{
+  "type": "pivot",
+  "description": "用自然语言描述透视的目的",
+  "file_id": "文件ID（从schemas中获取）",
+  "table": "源表名",
+  "row_fields": ["行分组列1", "行分组列2"],
+  "col_fields": ["列分组列（可选，为空则无交叉，仅一维分组）"],
+  "values": [
+    {"column": "聚合列", "function": "SUM | COUNT | AVERAGE | MIN | MAX", "as": "结果列名"}
+  ],
+  "sort": {"by": "排序列（可选）", "order": "asc | desc"},
+  "output": {"type": "new_sheet", "name": "新Sheet名"}
+}
+```
+
+**示例**：按月份和地区交叉统计销售额
+```json
+{
+  "type": "pivot",
+  "description": "按月份和地区交叉统计各产品的销售总额",
+  "file_id": "file-001",
+  "table": "销售明细",
+  "row_fields": ["月份"],
+  "col_fields": ["地区"],
+  "values": [
+    {"column": "销售额", "function": "SUM", "as": "销售总额"}
+  ],
+  "output": {"type": "new_sheet", "name": "销售透视表"}
+}
+```
+
+**注意**：
+- 如果 `col_fields` 为空数组 `[]`，则不进行列交叉，只按 `row_fields` 一维分组
+- 对应 Excel 365 的 PIVOTBY 函数
+
 ---
 
 ## 表达式对象格式

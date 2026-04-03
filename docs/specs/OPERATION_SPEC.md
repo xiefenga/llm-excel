@@ -19,6 +19,7 @@
 | `select_columns` | 选择列       | 投影后的表 | **Excel 365+** |
 | `drop_columns`   | 删除列       | 剩余列表   | **Excel 365+** |
 | `create_sheet`   | 创建新 Sheet | 新 Sheet   | 内部抽象       |
+| `pivot`          | 数据透视     | 透视结果表 | **Excel 365+** |
 
 ---
 
@@ -398,6 +399,79 @@
 
 ---
 
+### 3.11 pivot（数据透视）⚠️ Excel 365+
+
+按行和列维度对数据进行分组聚合，生成二维交叉表。对应 Excel 365 的 `PIVOTBY` 函数（2024年1月加入）。
+
+```json
+{
+  "type": "pivot",
+  "description": "用自然语言描述这一操作的目的",
+  "file_id": "文件ID",
+  "table": "源表名",
+  "row_fields": ["行分组列1", "行分组列2"],
+  "col_fields": ["列分组列"],
+  "values": [
+    { "column": "聚合列", "function": "SUM", "as": "结果列名" }
+  ],
+  "sort": {
+    "by": "列名（聚合列或分组列）",
+    "order": "asc | desc"
+  },
+  "filter": [
+    { "column": "列名", "op": "运算符", "value": "值" }
+  ],
+  "output": { "type": "new_sheet", "name": "透视结果表" }
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `row_fields` | string[] | ✅ | 行区域分组列（至少1个） |
+| `col_fields` | string[] | ❌ | 列区域分组列（为空则只有行分组，无交叉） |
+| `values` | object[] | ✅ | 值区域聚合定义 |
+| `values[].column` | string | ✅ | 要聚合的列名 |
+| `values[].function` | string | ✅ | 聚合函数：SUM/COUNT/AVERAGE/MIN/MAX |
+| `values[].as` | string | ✅ | 聚合结果列名 |
+| `sort.by` | string | ❌ | 排序列名 |
+| `sort.order` | string | ❌ | asc 或 desc |
+| `filter` | object[] | ❌ | 透视前筛选条件 |
+| `output.type` | string | ✅ | 输出类型：new_sheet |
+| `output.name` | string | ✅ | 输出 sheet 名称 |
+
+**与 `group_by` 的区别：**
+
+| 特性 | `group_by` | `pivot` |
+|------|------------|---------|
+| 行分组 | 支持 | 支持 |
+| 列分组（交叉表） | 不支持 | 支持 |
+| 多聚合同时展示 | 需多次操作 | 单次搞定 |
+| 输出结构 | 扁平一维/二维 | 真正的行列交叉矩阵 |
+
+**示例：**
+
+```json
+// 按月份和地区交叉统计销售额
+{
+  "type": "pivot",
+  "description": "按月份和地区交叉统计销售额和销量",
+  "file_id": "abc-123",
+  "table": "订单",
+  "row_fields": ["月份"],
+  "col_fields": ["地区"],
+  "values": [
+    { "column": "销售额", "function": "SUM", "as": "总销售额" },
+    { "column": "销量", "function": "COUNT", "as": "订单数" }
+  ],
+  "sort": { "by": "总销售额", "order": "desc" },
+  "output": { "type": "new_sheet", "name": "月份地区透视" }
+}
+```
+
+---
+
 ## 四、JSON 输出格式
 
 ### 完整结构
@@ -486,7 +560,7 @@ JSON 操作描述 → 格式校验 → 操作类型校验 → 函数白名单校
 ```
 aggregate, add_column, update_column, compute,
 filter, sort, group_by, take, create_sheet,
-select_columns, drop_columns
+select_columns, drop_columns, pivot
 ```
 
 ### 必需字段
@@ -500,6 +574,7 @@ select_columns, drop_columns
 | update_column                          | type, file_id, table, column, formula                              |
 | compute                                | type, expression, as                                               |
 | filter/sort/group_by/take/select/drop  | type, file_id, table + 各操作特有字段                              |
+| pivot                                  | type, file_id, table, row_fields, values, output                   |
 
 ### 函数白名单
 
@@ -508,6 +583,8 @@ select_columns, drop_columns
 **行级函数**（add_column formula）：`IF`, `AND`, `OR`, `NOT`, `ISBLANK`, `ISNA`, `ISNUMBER`, `ISERROR`, `VLOOKUP`, `COUNTIFS`, `IFERROR`, `ROUND`, `ABS`, `LEFT`, `RIGHT`, `MID`, `LEN`, `TRIM`, `UPPER`, `LOWER`, `PROPER`, `CONCAT`, `TEXT`, `VALUE`, `SUBSTITUTE`, `FIND`, `SEARCH`
 
 **标量函数**（compute expression）：`ROUND`, `ABS`, `MAX`, `MIN`
+
+**透视聚合函数**（pivot.values.function）：`SUM`, `COUNT`, `AVERAGE`, `MIN`, `MAX`
 
 ---
 
@@ -573,6 +650,7 @@ formula: price * 0.9  →  =D{row}*0.9
 | 分组聚合     | group_by       | GROUPBY()      |
 | 取前/后 N 行 | take           | TAKE()         |
 | 选择/删除列  | select/drop    | CHOOSECOLS()   |
+| 数据透视     | pivot          | PIVOTBY()      |
 
 > ⚠️ GROUPBY 函数需要 2023年9月更新版本的 Excel 365。
 
@@ -583,4 +661,3 @@ formula: price * 0.9  →  =D{row}*0.9
 | 自由 JOIN  | 用 VLOOKUP 替代         |
 | 自定义函数 | 不支持                  |
 | 删除行     | 用 filter 筛选替代      |
-| 透视表     | 用 group_by 替代        |

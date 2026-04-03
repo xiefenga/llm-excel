@@ -184,7 +184,9 @@ class IntentClassifier:
     def _looks_like_analysis(self, query: str) -> bool:
         """判断是否像分析请求"""
         analysis_keywords = ['分析', '总结', '统计', '趋势', '分布', '洞察', '报告',
-                            '查看', '观察', '了解', '认识', '特点', '特征']
+                            '查看', '观察', '了解', '认识', '特点', '特征',
+                            '透视', '交叉', '多维度', 'pivot', 'crosstab', '交叉表',
+                            '行列分析', '维度', '分组统计']
         query_lower = query.lower()
         return any(kw in query_lower for kw in analysis_keywords)
 

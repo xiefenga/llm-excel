@@ -13,6 +13,7 @@ from app.engine.models import (
     SelectColumnsOperation,
     DropColumnsOperation,
 )
+from app.engine.pivot_models import PivotOperation
 
 
 class ExcelFormulaGenerator:
@@ -345,6 +346,29 @@ def generate_formulas(operations: List, tables: FileCollection) -> List[Dict]:
                 "note": "GROUPBY 函数需要 Excel 365（2023年9月更新版本）"
             })
 
+        elif isinstance(op, PivotOperation):
+            # pivot 操作
+            excel_file = tables.get_file(op.file_id)
+            formula = _generate_pivot_formula(op, generator)
+            output_name = op.output.get("name", "数据透视")
+            row_fields = ", ".join(op.row_fields)
+            col_fields = ", ".join(op.col_fields) if op.col_fields else ""
+            fallback_desc = f"对 {op.table} 表按「{row_fields}」进行数据透视"
+            if col_fields:
+                fallback_desc += f"，列字段为「{col_fields}」"
+            fallback_desc += f"，结果输出到 {output_name}"
+            results.append({
+                "type": "pivot",
+                "file_id": op.file_id,
+                "filename": excel_file.filename,
+                "sheet": op.table,
+                "output_sheet": output_name,
+                "formula": formula,
+                "description": _get_description(op, fallback_desc),
+                "excel_version": "Excel 365+",
+                "note": "PIVOTBY 函数需要 Excel 365（2024年更新版本）"
+            })
+
         elif isinstance(op, CreateSheetOperation):
             # create_sheet 操作（无 Excel 公式）
             excel_file = tables.get_file(op.file_id)
@@ -674,6 +698,49 @@ def _generate_drop_columns_formula(op: DropColumnsOperation, generator: ExcelFor
         return f"=CHOOSECOLS({data_range}, {', '.join(indices)})"
     except Exception:
         return f"=CHOOSECOLS({table_name}!A:Z, ...)"
+
+
+def _generate_pivot_formula(op: PivotOperation, generator: ExcelFormulaGenerator) -> str:
+    """
+    生成 PIVOTBY 公式
+
+    Excel 格式：=PIVOTBY(row_fields, col_fields, values, [function], [options], [sort_order])
+    """
+    table_name = op.table
+    file_id = op.file_id
+
+    # row_fields: 转为列引用
+    row_refs = []
+    for col in op.row_fields:
+        col_letter = generator._find_column_letter(file_id, table_name, col)
+        row_refs.append(f"{table_name}![{col}]")
+
+    # col_fields: 转为列引用
+    col_refs = []
+    if op.col_fields:
+        for col in op.col_fields:
+            col_letter = generator._find_column_letter(file_id, table_name, col)
+            col_refs.append(f"{table_name}![{col}]")
+
+    # values + functions
+    value_funcs = []
+    for v in op.values:
+        func = v.function.upper()
+        value_funcs.append(f"{func}({table_name}![{v.column}])")
+
+    # 构建 PIVOTBY
+    row_part = f"HSTACK({', '.join(row_refs)})" if len(row_refs) > 1 else row_refs[0]
+    col_part = f"HSTACK({', '.join(col_refs)})" if len(col_refs) > 1 else (col_refs[0] if col_refs else "")
+
+    if op.col_fields:
+        # 有列字段，使用完整的 PIVOTBY
+        val_part = f"HSTACK({', '.join(value_funcs)})"
+        # 排序参数：0 = 无排序，1 = 按行升序，2 = 按行降序
+        sort_order = "2" if op.sort and op.sort.order == "desc" else "1"
+        return f"=PIVOTBY({row_part}, {col_part}, {val_part}, , , {sort_order})"
+    else:
+        # 无列字段，使用 GROUPBY
+        return f"=GROUPBY({row_part}, {value_funcs[0]}, {op.values[0].function.upper()})"
 
 
 def format_formula_output(formula_results: List[Dict]) -> str:
