@@ -228,6 +228,7 @@ selgetabel/
 | `select_columns` | 选择特定列                       |
 | `drop_columns`   | 删除列                           |
 | `create_sheet`   | 创建新工作表                     |
+| `pivot`          | 数据透视表（交叉表）             |
 
 ## 相关文档
 

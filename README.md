@@ -228,6 +228,7 @@ Intent Recognition → Generate + Validate (LLM, with retry) → Execute → Exp
 | `select_columns` | Select specific columns |
 | `drop_columns` | Remove columns |
 | `create_sheet` | Create new worksheet |
+| `pivot` | Data pivot table (crosstab) |
 
 ## Documentation
 
