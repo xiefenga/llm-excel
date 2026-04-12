@@ -1,76 +1,77 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working in `apps/web/`.
 
 ## Commands
 
 ```bash
-# Dev server (from monorepo root)
-pnpm dev          # starts both web + api
-pnpm --filter @selgetabel/web dev  # web only
+# From repo root
+pnpm dev:web
 
-# Build & type-check
-pnpm --filter @selgetabel/web build
-pnpm --filter @selgetabel/web typecheck
-
-# Regenerate OpenAPI types from backend schema
-pnpm --filter @selgetabel/web api:schema
+# From apps/web
+pnpm dev
+pnpm build
+pnpm typecheck
+pnpm api:schema
 ```
 
 ## Architecture
 
-**React Router v7** (SSR-enabled, file-based routing) + **Tailwind CSS v4** + **TanStack Query** for data fetching.
+The frontend uses **React Router v7** with **SSR enabled**, **Vite**, **TypeScript**, **Tailwind CSS v4**, and **TanStack Query**.
+
+### Directory Structure
+
+```
+app/
+├── routes/            # File-based routes and layouts
+├── features/          # Domain modules: task, admin, auth, fixture, btrack
+├── components/        # Shared UI, layout, logo, chat, and primitive components
+├── hooks/             # Reusable React hooks
+├── lib/               # API clients, config, utils, permissions, SSE helpers
+├── contexts/          # React context providers
+├── stores/            # Local client state
+├── api/               # Route-adjacent API helpers
+├── assets/            # Static assets and SVGs
+└── types/             # Generated or shared frontend types
+```
 
 ### Routing
 
-File-based routes in `app/routes/`. Naming convention uses dot-separated segments with layout nesting:
+- Routing is file-based under `app/routes/`.
+- `_auth.*` files define authenticated shells and pages.
+- `_public.*` files define unauthenticated pages such as login and register.
+- Admin pages live under `_auth._app.admin.*`.
+- Dynamic params use React Router file conventions such as `$providerId`.
 
-- `_auth.tsx` — auth guard layout (checks login)
-- `_auth._app.tsx` — main app shell (header + sidebar)
-- `_auth._app.admin.*` — admin pages
-- `_public.*` — public pages (login, register)
+### Feature Boundaries
 
-Dynamic params use `$param` (e.g., `_auth._app.admin.provider.$providerId.tsx`).
+- `features/task/` contains the main task workbench and processing UI.
+- `features/admin/` contains provider, thread, user, and admin-facing pages.
+- `features/fixture/` supports fixture-driven demos and previews.
+- Shared visual primitives belong in `components/`, not in feature folders.
 
-### Key Directories
+### API And State
 
-- `app/routes/` — Page components (thin, delegate to features)
-- `app/features/` — Feature modules grouped by domain (admin, thread, auth, etc.)
-- `app/components/` — Shared components (app-level + `ui/` for primitives)
-- `app/lib/` — API clients, types, utilities
-- `app/hooks/` — Shared hooks
+- `app/lib/client.ts` is the typed `openapi-fetch` client.
+- `app/lib/api.ts` handles axios-based requests and streaming flows.
+- The app uses TanStack Query for server state and Zustand for local UI state.
+- `fetch-event-stream` is used for SSE-style incremental updates.
 
-### API Layer
+### Local Development Assumptions
 
-Two API clients coexist:
+- `vite.config.ts` proxies `/api` to `API_BASE_URL` and `/storage` to local MinIO.
+- `~/` resolves to `app/`.
+- API type generation is handled by `pnpm api:schema`.
 
-- `lib/client.ts` — **openapi-fetch** typed client (`/api/*` prefix, auto-proxied to backend)
-- `lib/api.ts` — **axios**-based client for legacy endpoints and SSE streaming
+## Testing
 
-SSE streaming uses `fetch-event-stream` for real-time processing events.
-
-### State Management
-
-- **TanStack Query** for server state (queries + mutations)
-- **Zustand** for client-side UI state
-- **Immer** (via `use-immer`) for complex state updates
-
-### UI Components
-
-- `app/components/ui/` — shadcn/ui primitives (Radix UI + CVA)
-- `@lobehub/icons` — LLM provider icons
-- `lucide-react` — General icons
-- `sonner` — Toast notifications
+- There is at least some colocated frontend logic coverage, for example `app/features/task/history-output-files.test.ts`.
+- Do not assume a broad frontend test harness is in place; verify how a touched module is currently exercised before adding new tests.
+- For most frontend changes, `pnpm typecheck` plus manual QA is the baseline.
 
 ## Component Conventions
 
-See [COMPONENT_CONVENTIONS.md](../../docs/conventions/COMPONENT_CONVENTIONS.md) for full rules:
-
-- Define components with `const` + arrow function (no `function` declarations)
-- Named export → `export const Xxx = ...`
-- Default export → define first, then `export default Xxx` at the bottom
-- One component per file; use directory + `index.tsx` for sub-components
-
-## Path Alias
-
-`~/` maps to `app/` (configured in tsconfig `paths`).
+- Prefer route files as composition layers, with heavier UI and logic living in `features/` or `components/`.
+- Keep shared UI filenames in kebab-case.
+- Follow existing patterns for shadcn-style primitives in `components/ui/`.
+- Before changing API access patterns, check whether the target call path belongs in the typed client, the axios client, or the SSE helper layer.

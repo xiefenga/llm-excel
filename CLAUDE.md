@@ -1,277 +1,126 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working in this repository.
 
 ## Project Overview
 
-**Selgetabel** is an LLM-assisted Excel data processing system. Users describe data processing requirements in natural language, and the system generates structured JSON operations that are executed to produce Excel files with formulas.
+**Selgetabel** is an LLM-assisted Excel processing system. Users upload one or more Excel files, describe what they want in natural language, and the backend generates structured operations, validates them, executes them, and exports reproducible Excel results with formulas.
 
-**Tech Stack:**
-- Frontend: React Router v7 + Vite + TypeScript
-- Backend: Python FastAPI + OpenAI API
-- Monorepo: pnpm workspace + Turborepo
-- Node.js: 22.22.0 | pnpm: 10.28.0 | Python: 3.11+
-
-## Development Commands
-
-```bash
-# Install dependencies (run from root)
-pnpm install
-
-# Install backend dependencies
-pnpm --filter @selgetabel/api install
-
-# Start both web and API
-pnpm dev
-
-# Start only API
-pnpm dev:api
-
-# Build all packages
-pnpm build
-
-# Format code
-pnpm format
-
-# Type checking
-pnpm check-types
-```
-
-## Architecture
-
-### Monorepo Structure
+## Monorepo Layout
 
 ```
 llm-excel/
 ├── apps/
-│   ├── api/          # Python FastAPI backend
-│   └── web/          # React Router v7 frontend
-├── docs/             # Technical documentation
-│   ├── design/       # System design & architecture
-│   ├── specs/        # Protocol & format specifications
-│   ├── conventions/  # Coding standards & workflows
-│   └── guides/       # How-to guides & references
-├── package.json      # Root workspace config
-├── pnpm-workspace.yaml
-└── turbo.json        # Turborepo task orchestration
+│   ├── api/           # FastAPI backend
+│   │   ├── app/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   ├── core/
+│   │   │   ├── engine/
+│   │   │   ├── processor/
+│   │   │   ├── services/
+│   │   │   ├── models/
+│   │   │   ├── schemas/
+│   │   │   ├── persistence/
+│   │   │   └── events/
+│   │   ├── tests/
+│   │   └── alembic/
+│   └── web/           # React Router v7 frontend
+│       ├── app/
+│       │   ├── routes/
+│       │   ├── features/
+│       │   ├── components/
+│       │   ├── hooks/
+│       │   ├── lib/
+│       │   ├── contexts/
+│       │   ├── stores/
+│       │   └── types/
+│       └── scripts/
+├── docs/
+├── docker/
+├── fixtures/
+└── turbo.json
 ```
 
-### Backend (apps/api)
-
-**Entry Point:** `apps/api/app/api/main.py` (FastAPI app: `app.main:app`)
-
-**Key Directories:**
-- `app/api/routes/` - API route handlers
-- `app/engine/` - Core logic: JSON parsing, execution engine, formula generation, LLM prompts
-- `app/processor/` - Processing pipeline and stages
-- `app/services/` - Business logic, file I/O, auth, MinIO integration
-- `app/models/` - SQLAlchemy ORM models
-- `app/core/` - Config, database, JWT, permissions
-
-**Core Flow:**
-1. User uploads Excel file(s) → returns `file_id` for each
-2. User sends natural language query + `file_ids` via `POST /chat`
-3. Backend streams SSE events: `load` → `generate` → `validate` → `execute` → `export`
-4. LLM generates structured JSON operations (not raw formulas)
-5. Executor parses JSON, executes operations, generates Excel formulas
-6. Returns preview data + downloadable Excel file with formulas
-
-**Operation Types:**
-- `aggregate` - Column aggregation (SUM, AVERAGE, SUMIF, etc.)
-- `add_column` - Add calculated column with formula
-- `update_column` - Update existing column (e.g., fill nulls)
-- `compute` - Scalar computation on variables
-- `filter`, `sort`, `group_by`, `take`, `select_columns`, `drop_columns`, `pivot` - Excel 365+ dynamic array operations
-- `create_sheet` - Create new worksheet (internal abstraction)
-
-**Formula Expression Format:**
-All formulas use JSON objects (not strings) to avoid parsing ambiguity:
-```json
-{
-  "op": "*",
-  "left": {"col": "price"},
-  "right": {"value": 0.9}
-}
-```
-
-**Environment Variables (local dev):**
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET_KEY` - JWT signing key
-- `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` - MinIO config
-- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` - LLM fallback config (can also configure via `/llm` API)
-
-**File Storage:**
-- Files stored in MinIO object storage
-- MinIO accessible at `http://localhost:9000` (API), `http://localhost:9001` (Console)
-- Default credentials in `.env` file
-
-### Frontend (apps/web)
-
-**Framework:** React Router v7 (file-based routing)
-
-**Key Directories:**
-- `app/routes/` - File-based routes
-- `app/components/` - Reusable UI components
-- `app/features/` - Feature-specific components
-- `app/lib/` - Utilities and API client
-
-**API Integration:**
-- Frontend requests to `/api/*` are proxied to backend in dev mode
-- Proxy configured in `vite.config.ts`
-- Default backend: `http://localhost:8000`
-- Override with `API_BASE_URL` env var
-
-**Dev Ports:**
-- Web: `http://localhost:5173`
-- API: `http://localhost:8000`
-- API Docs: `http://localhost:8000/docs`
-
-## Key Technical Concepts
-
-### LLM Processing Pipeline
-
-The system uses a single-step LLM flow:
-1. LLM receives user requirement + table structure
-2. LLM generates structured JSON operations
-3. Parser validates format and function whitelist
-4. Executor runs operations and generates Excel formulas
-
-### JSON Expression Objects
-
-Formulas are represented as JSON objects to ensure unambiguous parsing:
-
-**Types:**
-- Literal: `{"value": 100}`
-- Column reference: `{"col": "price"}`
-- Cross-table reference: `{"ref": "table.column"}`
-- Variable reference: `{"var": "total"}`
-- Function call: `{"func": "IF", "args": [...]}`
-- Binary operation: `{"op": "+", "left": {...}, "right": {...}}`
-
-### Excel Formula Generation
-
-The executor generates Excel formulas from JSON operations:
-- Row formulas use `{row}` placeholder (e.g., `=D{row}*0.9`)
-- Column names mapped to Excel column letters (A, B, C, etc.)
-- All operations produce 100% reproducible Excel formulas
-
-### SSE Event Stream
-
-`POST /chat` streams Server-Sent Events through the processing pipeline:
-- `load` - File loading
-- `generate` - LLM operation generation
-- `validate` - JSON validation
-- `execute` - Operation execution + formula generation
-- `export` - Output file creation
-
-## Important Files
-
-**Backend:**
-- `apps/api/app/main.py` - FastAPI app entry
-- `apps/api/app/engine/executor.py` - Execution engine + JSON expression evaluator
-- `apps/api/app/engine/parser.py` - JSON parser + validation
-- `apps/api/app/engine/functions.py` - Function implementations
-- `apps/api/app/engine/excel_generator.py` - Excel formula generation
-- `apps/api/app/engine/prompt.py` - LLM prompt templates
-- `apps/api/app/processor/excel_processor.py` - Processing pipeline orchestrator
-
-**Frontend:**
-- `apps/web/app/routes/_auth._app._index.tsx` - Main chat interface
-- `apps/web/app/lib/api.ts` - API client
-- `apps/web/vite.config.ts` - Vite config with API proxy
-
-**Documentation:**
-- `docs/specs/OPERATION_SPEC.md` - Complete operation specification
-- `docs/specs/SSE_SPEC.md` - SSE event protocol
-- `docs/specs/STEPS_STORAGE_SPEC.md` - ThreadTurn steps storage format
-- `README.md` - Project overview and setup
-
-## Docker Deployment
+## Development Commands
 
 ```bash
-# Build and start with docker-compose
-cd docker
-docker compose up --build -d
-
-# Access points
-# - Web: http://localhost:8080
-# - API (via Nginx): http://localhost:8080/api/*
-# - MinIO Console: http://localhost:9001
+# From repo root
+pnpm install
+pnpm dev
+pnpm dev:web
+pnpm dev:api
+pnpm build
+pnpm check-types
+pnpm format
 ```
 
-**Environment Variables for Docker:**
-Set in `docker/.env` (copy from `docker/.env.example`):
-- `OPENAI_MODEL`
-- `OPENAI_BASE_URL`
-- `OPENAI_API_KEY`
-- `POSTGRES_PASSWORD`
-- `MINIO_ROOT_PASSWORD`
-- `JWT_SECRET_KEY`
+Backend commands:
 
-**Production Deployment:**
-See `docker/README.md` for detailed deployment guide.
+```bash
+# From apps/api
+uv sync
+uv run uvicorn app.main:app --reload --host localhost --port 8000
+uv run alembic upgrade head
+uv run pytest tests
+```
 
-## CI/CD - GitHub Actions
+Frontend commands:
 
-**Multi-Architecture Docker Build:**
-- Workflow: `.github/workflows/docker-build-push.yml`
-- Supported architectures: `linux/amd64`, `linux/arm64`
-- Builds both API and Web images with multi-arch support
+```bash
+# From apps/web
+pnpm dev
+pnpm build
+pnpm typecheck
+pnpm api:schema
+```
 
-**Triggers:**
-- **Auto:** Push tags matching `v*` (e.g., `v1.0.0`) - automatically pushes `latest` tag
-- **Manual:** Workflow dispatch in GitHub Actions UI - option to push `latest` tag
+## Backend Architecture
 
-**Required GitHub Secrets:**
-- `DOCKERHUB_TOKEN` (required) - Docker Hub access token with Read & Write permission
-- `DOCKERHUB_USERNAME` (optional) - Defaults to repository owner if not set
+**Primary entry point:** `apps/api/app/main.py`
 
-**Built Images:**
-- `${DOCKERHUB_USERNAME}/selgetabel-api:${VERSION}`
-- `${DOCKERHUB_USERNAME}/selgetabel-web:${VERSION}`
+**HTTP routing:** `apps/api/app/api/main.py` aggregates route modules for chat, auth, file, thread, btrack, role, user, llm, and dev-only fixture APIs.
 
-**How it works:** Uses Docker Buildx + QEMU on GitHub's x86 runners to build both amd64 (native) and arm64 (emulated) images, then creates a manifest list for automatic architecture selection.
+**Important backend layers:**
+- `app/core/` — config, database, JWT, permissions, encryption, branding, SSE helpers.
+- `app/engine/` — LLM integration, intent classification, context building, parser, executor, Excel formula generation, provider adapters.
+- `app/processor/` — staged processing pipeline and stage contracts.
+- `app/services/` — chat, processing stream, context, intent, auth, file, thread, and LLM config services.
+- `app/models/` and `app/schemas/` — ORM and API schema definitions.
+- `app/persistence/` and `app/events/` — repository and event-bus support code.
 
-## Code Conventions
+**Typical processing flow:**
+1. Upload Excel file(s).
+2. Submit a request through the chat flow.
+3. Backend classifies intent and builds prompt/context.
+4. LLM generates structured operations or chat output.
+5. Parser and pipeline validate the response, retrying when needed.
+6. Executor runs operations and emits exportable results through SSE.
 
-**Backend:**
-- Python 3.11+ with type hints
-- FastAPI for REST API + SSE
-- `uv` for dependency management
-- Function whitelist validation for security
+## Frontend Architecture
 
-**Frontend:**
-- TypeScript strict mode
-- React Router v7 file-based routing
-- Tailwind CSS for styling
-- SSE for real-time updates
+**Framework:** React Router v7 with SSR enabled, built through Vite.
 
-## Testing & Debugging
+**Key frontend areas:**
+- `app/routes/` — file-based route definitions and layouts.
+- `app/features/` — domain modules such as task, admin, auth, fixture, and btrack.
+- `app/components/` — shared UI and layout primitives.
+- `app/lib/` — API clients, config, permissions, provider utilities, and SSE helpers.
+- `app/hooks/`, `app/contexts/`, and `app/stores/` — state and composition utilities.
 
-**Backend:**
-- Swagger docs: `http://localhost:8000/docs`
-- Test with sample files in `apps/api/data/`
+**Data access:**
+- `app/lib/client.ts` uses `openapi-fetch` for typed API access.
+- `app/lib/api.ts` covers axios-based requests and streaming cases.
+- Vite proxies `/api` to the backend and `/storage` to MinIO during local development.
 
-**Frontend:**
-- React Router dev tools available in browser
-- API proxy logs in terminal
+## Testing And Verification
 
-## Common Workflows
+- Backend automated tests currently live in `apps/api/tests/`.
+- The frontend has limited colocated tests for pure logic; do not assume broad UI test coverage exists.
+- For most changes, prefer running `pnpm check-types` plus targeted backend tests and manual end-to-end validation.
 
-**Adding a new operation type:**
-1. Define operation schema in `docs/specs/OPERATION_SPEC.md`
-2. Add validation in `apps/api/app/engine/parser.py`
-3. Implement execution in `apps/api/app/engine/executor.py`
-4. Add formula generation in `apps/api/app/engine/excel_generator.py`
-5. Update LLM prompt in `apps/api/app/engine/prompt.py`
+## Working Conventions
 
-**Adding a new function:**
-1. Add to function whitelist in `engine/parser.py`
-2. Implement in `engine/functions.py`
-3. Add formula template in `engine/excel_generator.py`
-4. Update `docs/specs/OPERATION_SPEC.md`
-
-**Modifying frontend routes:**
-- Routes are file-based in `apps/web/app/routes/`
-- Naming convention: `_auth._app.routename.tsx` for authenticated routes
-- Use `_index.tsx` for index routes
+- Keep documentation and code structure descriptions aligned with the actual tree; this repo has evolved beyond its original scaffolding.
+- When changing backend flows, update the matching design/spec docs in `docs/design/` or `docs/specs/` if behavior changes.
+- When changing frontend route structure or API access patterns, verify the React Router file naming and proxy assumptions still hold.

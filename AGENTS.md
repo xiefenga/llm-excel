@@ -1,42 +1,57 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `apps/api/` — FastAPI backend (entry: `apps/api/app/main.py`, routes in `apps/api/app/api/`).
-- `apps/web/` — React Router + Vite frontend (app code in `apps/web/app/`).
-- `docs/` — design docs and specs (e.g., `docs/OPERATION_SPEC.md`).
-- `docker/` — production and dev compose files plus scripts.
-- `fixtures/` — sample data used in development.
+- `apps/api/` — FastAPI backend. App entry is `apps/api/app/main.py`; API router aggregation lives in `apps/api/app/api/main.py`.
+- `apps/api/app/` — backend source, organized into `api/`, `core/`, `engine/`, `processor/`, `services/`, `models/`, `schemas/`, `persistence/`, and `events/`.
+- `apps/api/tests/` — backend automated tests for pipeline and stage behavior.
+- `apps/web/` — React Router v7 + Vite frontend. Main app code lives in `apps/web/app/`.
+- `apps/web/app/` — frontend source, organized into `routes/`, `features/`, `components/`, `hooks/`, `lib/`, `contexts/`, `stores/`, and `types/`.
+- `docs/` — architecture, specs, conventions, deployment, and operational guides.
+- `docker/` — dev and production compose files, nginx config, initialization SQL, and deployment scripts.
+- `fixtures/` — example datasets and metadata for local development and demos.
 
 ## Build, Test, and Development Commands
 Run from repo root unless noted.
-- `pnpm dev` — start all apps via Turbo.
-- `pnpm dev:api` — start API only (FastAPI).
+- `pnpm install` — install workspace dependencies.
+- `pnpm dev` — start web and API through Turbo.
+- `pnpm dev:web` — start frontend only.
+- `pnpm dev:api` — start backend only.
 - `pnpm build` — build all packages.
-- `pnpm check-types` — run type checks across packages.
-- `pnpm lint` — run lint tasks defined in packages.
-- `pnpm format` — format `ts/tsx/md` with Prettier.
-- `pnpm dev:docker` — start dev Docker stack.
-- `pnpm docker:build` / `pnpm docker:up` / `pnpm docker:down` — build and manage prod stack.
+- `pnpm check-types` — run workspace type checks.
+- `pnpm lint` — run lint tasks defined by packages.
+- `pnpm format` — format `ts/tsx/md` files with Prettier.
+- `pnpm dev:docker` — start the local Docker development stack.
 
-API-only local workflow (from `apps/api/`):
-- `uv sync` — install Python deps.
-- `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` — start API.
+Backend workflow from `apps/api/`:
+- `uv sync` — install Python dependencies.
+- `uv run uvicorn app.main:app --reload --host localhost --port 8000` — run API locally.
+- `uv run alembic upgrade head` — apply database migrations.
+- `uv run pytest tests` — run backend tests.
+
+Frontend workflow from `apps/web/`:
+- `pnpm dev` — run the React Router app.
+- `pnpm build` — build production assets.
+- `pnpm typecheck` — generate route types and run TypeScript checks.
+- `pnpm api:schema` — regenerate typed API schema bindings.
 
 ## Coding Style & Naming Conventions
-- TypeScript/TSX: Prettier is the source of truth (`pnpm format`).
-- React components live in `apps/web/app/components/` and use kebab-case filenames (e.g., `user-profile-dialog.tsx`).
-- Python modules use snake_case; keep functions typed where practical.
-- Match existing formatting and import ordering in nearby files.
+- TypeScript/TSX formatting is managed with Prettier; follow nearby patterns for imports and component layout.
+- React code uses file-based routing and feature grouping. Keep route files thin and place reusable UI in `components/` or feature modules in `features/`.
+- Frontend component filenames use kebab-case.
+- Python modules use snake_case and should keep type hints where practical.
+- Prefer small, focused modules over growing orchestration files further.
 
 ## Testing Guidelines
-- No dedicated test runner is configured in this repo.
-- Use `pnpm check-types` and manual QA; add tests if you introduce critical logic.
+- Backend tests live in `apps/api/tests/` and run with `uv run pytest tests` from `apps/api/`.
+- The frontend currently has a small number of colocated Node-based tests such as `apps/web/app/features/task/history-output-files.test.ts`; expand this pattern when adding critical pure logic.
+- At minimum, run the most relevant checks for touched areas: `pnpm check-types`, backend pytest for API changes, and manual QA for end-to-end flows.
 
 ## Commit & Pull Request Guidelines
-- Commit messages follow Conventional Commits with short Chinese summaries (examples: `feat: 添加权限相关逻辑`, `fix: 修复postgresql数据卷挂载目录`, `chore: 优化compose`).
-- PRs should include a concise summary, steps to test (commands run), and linked issues when relevant.
-- UI changes should include screenshots or a short screen recording.
+- Commit messages follow Conventional Commits with short Chinese summaries, for example `feat: 增加意图识别上下文构建` or `fix: 修复导出结果回显逻辑`.
+- PRs should include a concise summary, impacted areas, verification commands, and linked issues when relevant.
+- UI-facing changes should include screenshots or a short screen recording.
 
 ## Configuration Tips
-- Environment variables live in `.env` files; see `ENV.md` and `apps/api/README.md` for required keys.
-- Docker installs are managed via `install.sh` and the `docker/` scripts.
+- Root and app-specific `.env` files drive local configuration; check `ENV.md`, `README.md`, and `docker/.env.example` when wiring new environments.
+- The frontend proxies `/api` to the backend and `/storage` to MinIO in development; keep that in mind when changing local ports.
+- MinIO, PostgreSQL, and Docker bootstrap assets are under `docker/`; prefer updating those assets together with any infra-facing behavior change.
