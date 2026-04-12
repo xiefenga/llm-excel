@@ -1,10 +1,5 @@
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from app.processor import stages
-from app.processor.stages.errors import StageError
+import tablo.stages as stages
+from tablo.stages.errors import StageError
 
 
 def test_stages_package_only_exports_active_stages():

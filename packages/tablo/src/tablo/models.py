@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 # 延迟导入避免循环依赖
-from app.engine.pivot_models import PivotOperation
+from tablo.pivot_models import PivotOperation
 
 
 # ==================== 辅助函数 ====================

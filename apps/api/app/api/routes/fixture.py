@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.sse import sse_error
 from app.services.processor_stream import stream_excel_processing
-from app.engine.excel_parser import ExcelParser
+from tablo import ExcelParser
 from app.services.fixture import get_fixture_service
 
 logger = logging.getLogger(__name__)

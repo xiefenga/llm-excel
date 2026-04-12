@@ -12,7 +12,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.models.thread import Thread, ThreadTurn, TurnFile
 from app.models.file import File
 from app.engine.step_tracker import StepTracker
-from app.engine.models import ExcelError
+from tablo.models import ExcelError
 
 logger = logging.getLogger(__name__)
 

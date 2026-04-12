@@ -2,7 +2,7 @@
 
 import json
 from typing import List, Dict, Any, Tuple, Optional, Set
-from app.engine.models import (
+from tablo.models import (
     AggregateOperation,
     AddColumnOperation,
     UpdateColumnOperation,
@@ -16,7 +16,7 @@ from app.engine.models import (
     DropColumnsOperation,
     Operation,
 )
-from app.engine.pivot_models import PivotOperation
+from tablo.pivot_models import PivotOperation
 
 
 # ==================== 白名单定义 ====================

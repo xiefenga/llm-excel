@@ -4,10 +4,10 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Generator, Optional, TYPE_CHECKING
 
-from ..types import ProcessStage, EventType, ProcessEvent, ProcessConfig
+from tablo.types import ProcessStage, EventType, ProcessEvent, ProcessConfig
 
 if TYPE_CHECKING:
-    from app.engine.models import FileCollection
+    from tablo.models import FileCollection
 
 
 class Stage(ABC):

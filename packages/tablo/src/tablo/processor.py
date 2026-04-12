@@ -10,13 +10,12 @@ from .types import (
     ProcessConfig,
     ProcessResult,
 )
-from .stages import GenerateValidateStage, ExecuteStage
+from tablo.stages import GenerateValidateStage, ExecuteStage
 from .stages.errors import StageError
 
 if TYPE_CHECKING:
-    from app.engine.models import FileCollection
-    from app.engine.llm_client import LLMClient
-    from app.engine.context_builder import ContextBuilder
+    from tablo.models import FileCollection
+    from typing import Any as LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +45,18 @@ class ExcelProcessor:
             yield convert_to_sse(event)
     """
 
-    def __init__(self, llm_client: "LLMClient", context_builder: Optional["ContextBuilder"] = None):
+    def __init__(self, llm_client: "LLMClient"):
         """
         初始化处理器
 
         Args:
             llm_client: LLM 客户端
-            context_builder: 上下文构建器（可选）
         """
         self.llm_client = llm_client
-        self.context_builder = context_builder
 
         # 创建各阶段实例（线性列表，保持可扩展性）
         self._stages = [
-            GenerateValidateStage(llm_client, context_builder),  # 复合阶段：生成+验证（支持重试）
+            GenerateValidateStage(llm_client),  # 复合阶段：生成+验证（支持重试）
             ExecuteStage(),
         ]
 

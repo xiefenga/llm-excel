@@ -13,7 +13,7 @@ from app.core.sse import sse, sse_session, sse_session_error
 from app.engine.step_tracker import StepTracker
 from app.models.btrack import BTrack
 from app.persistence import TurnRepository
-from app.processor import EventType
+from tablo import EventType
 from app.processor.prompt import build_initial_user_message
 from app.services.excel import get_files_by_ids_from_db, load_tables_from_files
 from app.services.processor_stream import StageContext, stream_excel_processing

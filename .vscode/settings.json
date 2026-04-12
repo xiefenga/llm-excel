@@ -1,4 +1,14 @@
 {
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/bin/python",
+  "python.pythonPath": "${workspaceFolder}/apps/api/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.envFile": "${workspaceFolder}/apps/api/.env",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/apps/api",
+    "${workspaceFolder}/packages/tablo/src"
+  ],
+  "python.analysis.venvPath": "${workspaceFolder}/apps/api",
+  "python.analysis.venv": ".venv",
   "files.associations": {
     "*.css": "tailwindcss"
   }

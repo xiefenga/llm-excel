@@ -1,9 +1,4 @@
-"""处理阶段实现"""
+"""API stage package marker.
 
-from .generate_validate import GenerateValidateStage
-from .execute import ExecuteStage
-
-__all__ = [
-    "GenerateValidateStage",
-    "ExecuteStage",
-]
+Executable processing stages live in `packages/tablo`.
+"""

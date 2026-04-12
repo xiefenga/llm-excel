@@ -19,8 +19,8 @@ from app.core.sse import (
     sse_step_done,
     sse_step_error,
 )
-from app.engine.models import FileCollection, column_index_to_letter
-from app.processor import ExcelProcessor, ProcessConfig, EventType
+from tablo.models import FileCollection, column_index_to_letter
+from tablo import ExcelProcessor, ProcessConfig, EventType
 from app.services.oss import upload_file
 from app.engine.context_builder import create_context_builder
 
@@ -267,20 +267,26 @@ async def stream_excel_processing(
     # === 2. generate/validate/execute ===
     llm_client = await get_llm_client()
     
-    # 创建上下文构建器（如果提供了历史记录）
-    context_builder = None
+    processing_context = ""
     if history_turns is not None:
-        context_builder = create_context_builder()
-    
-    processor = ExcelProcessor(llm_client, context_builder)
+        try:
+            processing_context = create_context_builder().build_prompt_context(
+                intent_type="processing",
+                current_query=query,
+                history_turns=history_turns,
+                current_files=current_files or [],
+                analysis_result="",
+            )
+            logger.info(f"已构建处理上下文，长度: {len(processing_context)} 字符")
+        except Exception as e:
+            logger.warning(f"构建处理上下文失败: {e}，将使用默认上下文")
+
+    processor = ExcelProcessor(llm_client)
     config = ProcessConfig(stream_llm=stream_llm)
 
-    # 构建上下文字典，传递给处理器
     context = {}
-    if history_turns is not None:
-        context["history_turns"] = history_turns
-    if current_files is not None:
-        context["current_files"] = current_files
+    if processing_context:
+        context["processing_context"] = processing_context
     
     gen = processor.process(tables, query, config, context)
     _GENERATOR_DONE = object()

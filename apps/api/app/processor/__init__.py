@@ -1,19 +1,5 @@
-"""Excel 处理器模块"""
+"""API processor package.
 
-from .types import (
-    ProcessStage,
-    EventType,
-    ProcessEvent,
-    ProcessConfig,
-    ProcessResult,
-)
-from .excel_processor import ExcelProcessor
-
-__all__ = [
-    "ProcessStage",
-    "EventType",
-    "ProcessEvent",
-    "ProcessConfig",
-    "ProcessResult",
-    "ExcelProcessor",
-]
+Reusable processing core now lives in `packages/tablo`.
+This package retains only API-local prompt/adaptation code.
+"""

@@ -1,7 +1,7 @@
 """输出生成器 - 生成思路解读和快捷复现"""
 
 from typing import List, Dict, Any, Optional
-from app.engine.models import (
+from tablo.models import (
     FileCollection,
     AggregateOperation,
     AddColumnOperation,
@@ -15,8 +15,8 @@ from app.engine.models import (
     SelectColumnsOperation,
     DropColumnsOperation,
 )
-from app.engine.pivot_models import PivotOperation
-from app.engine.excel_generator import ExcelFormulaGenerator
+from tablo.pivot_models import PivotOperation
+from tablo.excel_generator import ExcelFormulaGenerator
 
 
 # ==================== 常量定义 ====================

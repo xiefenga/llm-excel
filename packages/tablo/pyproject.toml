@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tablo"
+version = "0.1.0"
+description = "Reusable data processing core extracted from Selgetabel API"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.0.0",
+  "openpyxl>=3.1.0",
+  "xlrd==2.0.1",
+]
+
+[project.scripts]
+tablo = "tablo.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=7.4.0",
+  "anyio>=4.12.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

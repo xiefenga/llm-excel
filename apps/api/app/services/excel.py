@@ -11,7 +11,7 @@ from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.engine.models import FileCollection
+from tablo.models import FileCollection
 from app.engine.excel_parser import ExcelParser
 from app.models.file import File
 

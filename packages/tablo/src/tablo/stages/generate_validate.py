@@ -2,16 +2,15 @@
 import re
 import json
 import logging
-from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, Generator, List, TYPE_CHECKING
 
-from ..types import ProcessStage, EventType, ProcessEvent, ProcessConfig
-from .base import Stage
-from .errors import StageError
+from tablo.types import ProcessStage, EventType, ProcessEvent, ProcessConfig
+from tablo.stages.base import Stage
+from tablo.stages.errors import StageError
 
 if TYPE_CHECKING:
-    from app.engine.models import FileCollection
-    from app.engine.llm_client import LLMClient
-    from app.engine.context_builder import ContextBuilder
+    from tablo.models import FileCollection
+    from typing import Any as LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class GenerateValidateStage(Stage):
         - tables: 表集合
         - query: 用户查询
         - context["analyze"]: 分析结果（可选）
-        - context["history_turns"]: 历史对话记录（可选）
+        - context["processing_context"]: 外部编排层准备好的增强上下文（可选）
 
     输出:
         {
@@ -46,9 +45,8 @@ class GenerateValidateStage(Stage):
     # 主阶段标识（用于 context key）
     stage = ProcessStage.GENERATE
 
-    def __init__(self, llm_client: "LLMClient", context_builder: Optional["ContextBuilder"] = None):
+    def __init__(self, llm_client: "LLMClient"):
         self.llm_client = llm_client
-        self.context_builder = context_builder
 
     def run(
         self,
@@ -64,24 +62,7 @@ class GenerateValidateStage(Stage):
         analysis = context.get("analyze", {}).get("content", "")
         file_sheets = self._build_file_sheets(tables)
 
-        # 构建处理上下文（如果提供了ContextBuilder）
-        processing_context = ""
-        if self.context_builder:
-            try:
-                # 从context中获取历史对话记录
-                history_turns = context.get("history_turns", [])
-                current_files = context.get("current_files", [])
-                
-                processing_context = self.context_builder.build_prompt_context(
-                    intent_type="processing",
-                    current_query=query,
-                    history_turns=history_turns,
-                    current_files=current_files,
-                    analysis_result=analysis
-                )
-                logger.info(f"已构建处理上下文，长度: {len(processing_context)} 字符")
-            except Exception as e:
-                logger.warning(f"构建处理上下文失败: {e}，将使用默认上下文")
+        processing_context = context.get("processing_context", "")
 
         retry_count = 0
         max_retries = config.max_validation_retries
@@ -195,7 +176,7 @@ class GenerateValidateStage(Stage):
                 accumulated_text = ""
                 
                 for delta, full_content in self.llm_client.generate_operations_stream(
-                    query, analysis, schemas,
+                    enhanced_query, analysis, schemas,
                     previous_errors=previous_errors,
                     previous_json=previous_json,
                 ):
@@ -260,7 +241,7 @@ class GenerateValidateStage(Stage):
         yield self._create_event(ProcessStage.VALIDATE, EventType.STAGE_START, stage_id=stage_id)
 
         try:
-            from app.engine.parser import parse_and_validate
+            from tablo.parser import parse_and_validate
 
             parsed_operations, errors = parse_and_validate(operations_json, file_sheets)
 

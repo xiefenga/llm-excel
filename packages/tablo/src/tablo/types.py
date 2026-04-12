@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.engine.models import FileCollection
+    from tablo.models import FileCollection
 
 
 class ProcessStage(str, Enum):

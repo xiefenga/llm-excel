@@ -2,7 +2,7 @@
 
 import math
 from typing import Any, Union
-from app.engine.models import Range, ExcelError
+from tablo.models import Range, ExcelError
 
 
 # ==================== 辅助函数 ====================

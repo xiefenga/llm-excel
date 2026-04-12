@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 import pandas as pd
-from app.engine.models import (
+from tablo.models import (
     FileCollection,
     Table,
     Operation,
@@ -21,8 +21,8 @@ from app.engine.models import (
     OperationResult,
     ExcelError,
 )
-from app.engine.pivot_models import PivotOperation
-from app.engine.functions import (
+from tablo.pivot_models import PivotOperation
+from tablo.functions import (
     AGGREGATE_FUNC_MAP,
     ROW_FUNC_MAP,
     SCALAR_FUNC_MAP,

@@ -1,7 +1,7 @@
 """Excel 公式生成器 - 将 JSON 格式公式转换为 Excel 公式"""
 
 from typing import Dict, List, Any, Union
-from app.engine.models import (
+from tablo.models import (
     FileCollection,
     AddColumnOperation,
     UpdateColumnOperation,
@@ -13,7 +13,7 @@ from app.engine.models import (
     SelectColumnsOperation,
     DropColumnsOperation,
 )
-from app.engine.pivot_models import PivotOperation
+from tablo.pivot_models import PivotOperation
 
 
 class ExcelFormulaGenerator:

@@ -3,12 +3,12 @@
 import logging
 from typing import Any, Dict, Generator, List, TYPE_CHECKING
 
-from ..types import ProcessStage, ProcessEvent, ProcessConfig
-from .base import Stage
-from .errors import StageError
+from tablo.types import ProcessStage, ProcessEvent, ProcessConfig
+from tablo.stages.base import Stage
+from tablo.stages.errors import StageError
 
 if TYPE_CHECKING:
-    from app.engine.models import FileCollection
+    from tablo.models import FileCollection
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class ExecuteStage(Stage):
         try:
             # 执行操作（仅当验证通过时）
             if operations and not validation_errors:
-                from app.engine.executor import execute_operations
+                from tablo.executor import execute_operations
 
                 exec_result = execute_operations(operations, tables)
 
@@ -119,7 +119,7 @@ class ExecuteStage(Stage):
             manual_steps = None
 
             if operations:
-                from app.engine.output_generator import (
+                from tablo.output_generator import (
                     generate_strategy,
                     generate_manual_steps,
                 )
@@ -169,7 +169,7 @@ class ExecuteStage(Stage):
         """将对象转换为可序列化格式"""
         import math
         from datetime import datetime, date
-        from app.engine.models import ExcelError
+        from tablo.models import ExcelError
 
         if isinstance(obj, ExcelError):
             return str(obj)
