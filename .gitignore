@@ -19,3 +19,12 @@ docker/minio_data/*
 
 # Claude Code
 .claude/settings.local.json
+.omx/
+.codex/*
+!.codex/agents/
+!.codex/agents/**
+!.codex/skills/
+!.codex/skills/**
+.codex/skills/.system/**
+!.codex/prompts/
+!.codex/prompts/**
