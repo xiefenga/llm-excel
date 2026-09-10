@@ -19,16 +19,14 @@ interface EditModelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   model: LLMModel;
-  providerType: string;
 }
 
-export const EditModelDialog = ({ open, onOpenChange, model, providerType }: EditModelDialogProps) => {
+export const EditModelDialog = ({ open, onOpenChange, model }: EditModelDialogProps) => {
   const [name, setName] = useState("");
   const [modelId, setModelId] = useState("");
   const [maxTokens, setMaxTokens] = useState("");
 
   const updateModel = useUpdateModel(model.provider_id);
-
 
   // 当对话框打开时，初始化表单数据
   useEffect(() => {
@@ -58,7 +56,6 @@ export const EditModelDialog = ({ open, onOpenChange, model, providerType }: Edi
           limits.max_tokens = parsed;
         }
       }
-
 
       await updateModel.mutateAsync({
         id: model.id,

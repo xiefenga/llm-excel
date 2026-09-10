@@ -1,5 +1,9 @@
 # LLM 多 Provider 设计方案（全局配置 + 阶段路由）
 
+当前实现：Provider Registry 使用 OpenAI 适配器处理 `openai` 和
+`openai_compatible`；其他类型调用时返回未实现错误。产品统一使用
+Selgetabel 品牌及标准 Web 镜像。
+
 ## 1. 背景与现状
 
 目前后端 LLM 调用完全依赖 OpenAI SDK，配置通过 `.env` 提供 `OPENAI_*`，无法做到多厂商或按阶段选择模型。`LLMClient` 中直接创建 OpenAI 客户端并调用 `chat.completions`，其他模块（如线程标题）直接调用私有方法 `_call_llm`。这导致：

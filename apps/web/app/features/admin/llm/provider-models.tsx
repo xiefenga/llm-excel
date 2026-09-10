@@ -66,7 +66,7 @@ export const ProviderModels = ({ provider }: ProviderModelsProps) => {
                 </div>
               )}
               {enabled.map((model) => (
-                <ModelItem key={model.id} model={model} providerType={provider.type} />
+                <ModelItem key={model.id} model={model} />
               ))}
             </div>
           )}
@@ -79,7 +79,7 @@ export const ProviderModels = ({ provider }: ProviderModelsProps) => {
                 </div>
               )}
               {disabled.map((model) => (
-                <ModelItem key={model.id} model={model} providerType={provider.type} />
+                <ModelItem key={model.id} model={model} />
               ))}
             </div>
           )}
@@ -90,7 +90,6 @@ export const ProviderModels = ({ provider }: ProviderModelsProps) => {
         open={addOpen}
         onOpenChange={setAddOpen}
         providerId={provider.id}
-        providerType={provider.type}
       />
     </div>
   );

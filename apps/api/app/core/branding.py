@@ -1,14 +1,12 @@
 """产品品牌配置"""
 
 
-
 # 默认（英文）品牌配置
 DEFAULT_BRANDING = {
     "name": "Selgetabel",
     "description": "AI 驱动的 Excel 智能处理",
     "footer": "让数据处理更简单。",
 }
-
 
 
 def get_branding() -> dict:

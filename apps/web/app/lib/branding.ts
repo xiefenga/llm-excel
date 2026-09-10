@@ -2,8 +2,6 @@
  * 产品品牌配置
  */
 
-
-
 // 品牌配置
 const BRAND = {
   default: {

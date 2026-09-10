@@ -18,16 +18,14 @@ interface AddModelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerId: string;
-  providerType: string;
 }
 
-export const AddModelDialog = ({ open, onOpenChange, providerId, providerType }: AddModelDialogProps) => {
+export const AddModelDialog = ({ open, onOpenChange, providerId }: AddModelDialogProps) => {
   const [name, setName] = useState("");
   const [modelId, setModelId] = useState("");
   const [maxTokens, setMaxTokens] = useState("");
 
   const createModel = useCreateModel();
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +46,6 @@ export const AddModelDialog = ({ open, onOpenChange, providerId, providerType }:
           limits.max_tokens = parsed;
         }
       }
-
 
       await createModel.mutateAsync({
         provider_id: providerId,

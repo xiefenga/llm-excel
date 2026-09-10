@@ -405,7 +405,7 @@ print_next_steps() {
     echo -e "${GREEN}========================================${NC}"
     echo ""
 
-        echo -e "${BLUE}Version: Selgetabel${NC}"
+    echo -e "${BLUE}Version: Selgetabel${NC}"
     echo -e "${BLUE}Image Version: ${IMAGE_VERSION}${NC}"
     echo -e "${BLUE}Web Port: ${WEB_PORT}${NC}"
     echo ""
@@ -428,9 +428,9 @@ print_next_steps() {
 # Main function
 main() {
     echo ""
-        echo -e "${BLUE}======================================${NC}"
-        echo -e "${BLUE}  Selgetabel Quick Installation${NC}"
-        echo -e "${BLUE}======================================${NC}"
+    echo -e "${BLUE}======================================${NC}"
+    echo -e "${BLUE}  Selgetabel Quick Installation${NC}"
+    echo -e "${BLUE}======================================${NC}"
     echo ""
     echo -e "${BLUE}Configuration:${NC}"
     echo "  Image Version: ${IMAGE_VERSION}"

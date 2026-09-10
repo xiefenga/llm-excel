@@ -11,10 +11,9 @@ import { EditModelDialog } from "~/features/admin/llm/edit-model-dialog";
 
 interface ModelItemProps {
   model: LLMModel;
-  providerType: string;
 }
 
-export const ModelItem = ({ model, providerType }: ModelItemProps) => {
+export const ModelItem = ({ model }: ModelItemProps) => {
   const [editOpen, setEditOpen] = useState(false);
   const updateModel = useUpdateModel(model.provider_id);
   const deleteModelMutation = useDeleteModel(model.provider_id);
@@ -92,7 +91,6 @@ export const ModelItem = ({ model, providerType }: ModelItemProps) => {
         open={editOpen}
         onOpenChange={setEditOpen}
         model={model}
-        providerType={providerType}
       />
     </>
   );
